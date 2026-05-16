@@ -40,7 +40,13 @@ export async function signup(formData: FormData) {
     }
   };
 
-  const { error } = await supabase.auth.signUp(data);
+  const { error } = await supabase.auth.signUp({
+    ...data,
+    options: {
+      ...data.options,
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/auth/callback?next=${next}`,
+    },
+  });
 
   if (error) {
     const signupUrl = new URL("/signup", "http://localhost:3000");
