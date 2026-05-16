@@ -1,0 +1,94 @@
+import Link from "next/link";
+import { ChevronLeft, ShieldCheck, Lock, Eye, Server } from "lucide-react";
+
+export default function PrivacyPage() {
+  return (
+    <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans">
+      <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-xl shadow-slate-200/50 overflow-hidden border border-slate-100">
+        {/* Header */}
+        <div className="bg-[#11253E] p-8 text-white">
+          <Link href="/" className="inline-flex items-center text-slate-300 hover:text-white transition-colors mb-6 group">
+            <ChevronLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+            Back to Home
+          </Link>
+          <div className="flex items-center gap-4 mb-4">
+            <div className="p-3 bg-white/10 rounded-xl">
+              <ShieldCheck className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold font-outfit">Privacy Policy</h1>
+          </div>
+          <p className="text-slate-300">Last updated: May 16, 2026</p>
+        </div>
+
+        {/* Content */}
+        <div className="p-8 sm:p-12">
+          <section className="mb-12">
+            <div className="flex items-center gap-3 mb-4 text-[#11253E]">
+              <Eye className="w-6 h-6" />
+              <h2 className="text-2xl font-bold font-outfit m-0">1. Information We Collect</h2>
+            </div>
+            <p className="text-slate-600 leading-relaxed mb-4">
+              At JobVanta, we collect information that helps us provide a personalized career platform. This includes:
+            </p>
+            <ul className="list-disc pl-6 text-slate-600 space-y-2">
+              <li><strong>Account Information:</strong> Your name, email address, and profile details when you sign up.</li>
+              <li><strong>Resume Data:</strong> Any information you upload or input into our AI Resume Builder.</li>
+              <li><strong>Usage Data:</strong> Information about how you interact with our job search and resume tools.</li>
+              <li><strong>Payment Information:</strong> Handled securely by our payment partner, Dodo Payments. We do not store your full card details.</li>
+            </ul>
+          </section>
+
+          <section className="mb-12">
+            <div className="flex items-center gap-3 mb-4 text-[#11253E]">
+              <Server className="w-6 h-6" />
+              <h2 className="text-2xl font-bold font-outfit m-0">2. How We Use Your Data</h2>
+            </div>
+            <p className="text-slate-600 leading-relaxed mb-4">
+              We use your information to:
+            </p>
+            <ul className="list-disc pl-6 text-slate-600 space-y-2">
+              <li>Optimize your resume for Applicant Tracking Systems (ATS).</li>
+              <li>Match you with verified job opportunities that fit your profile.</li>
+              <li>Provide personalized career insights using AI technology.</li>
+              <li>Process your subscription payments via Dodo Payments.</li>
+              <li>Improve our algorithms to provide better search results.</li>
+            </ul>
+          </section>
+
+          <section className="mb-12">
+            <div className="flex items-center gap-3 mb-4 text-[#11253E]">
+              <Lock className="w-6 h-6" />
+              <h2 className="text-2xl font-bold font-outfit m-0">3. Data Security</h2>
+            </div>
+            <p className="text-slate-600 leading-relaxed">
+              We take the security of your data seriously. We use industry-standard encryption and security protocols to protect your information. Your data is stored securely using Supabase infrastructure, and all payment processing is handled by Dodo Payments, an industry leader in secure payment infrastructure.
+            </p>
+          </section>
+
+          <section className="mb-12">
+            <h2 className="text-2xl font-bold text-[#11253E] font-outfit mb-4">4. Your Rights</h2>
+            <p className="text-slate-600 leading-relaxed">
+              You have the right to access, correct, or delete your personal information at any time. You can manage your account settings directly through the JobVanta dashboard or contact our support team for assistance.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-bold text-[#11253E] font-outfit mb-4">5. Contact Us</h2>
+            <p className="text-slate-600 leading-relaxed">
+              If you have any questions about this Privacy Policy, please contact us at:
+              <br />
+              <span className="font-semibold text-[#11253E]">privacy@jobvanta.com</span>
+            </p>
+          </section>
+        </div>
+        
+        {/* Footer */}
+        <div className="bg-slate-50 border-t border-slate-100 p-8 text-center">
+          <p className="text-slate-500 text-sm">
+            &copy; 2026 JobVanta. All rights reserved.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}

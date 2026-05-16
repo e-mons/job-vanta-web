@@ -1,0 +1,143 @@
+﻿@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-heading: var(--font-outfit);
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --color-accent: var(--accent);
+  --color-border: var(--border);
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 2rem;
+}
+
+:root {
+  /* Premium Luxury Blue Palette */
+  --background: #ffffff;
+  --foreground: #0f172a;
+  
+  --primary: #11253E;
+  --primary-foreground: #ffffff;
+  
+  --secondary: #f1f5f9;
+  --secondary-foreground: #1e293b;
+  
+  --muted: #f8fafc;
+  --muted-foreground: #64748b;
+  
+  --accent: #e0f2fe;
+  --accent-foreground: #0369a1;
+  
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #3b82f6;
+
+  --radius: 1rem;
+
+  /* Specialty Colors */
+  --blue-50: #eff6ff;
+  --blue-100: #dbeafe;
+  --blue-500: #3b82f6;
+  --blue-600: #11253E;
+  --indigo-500: #6366f1;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased selection:bg-blue-100 selection:text-blue-900;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/70 backdrop-blur-xl border border-white/40 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)];
+  }
+  
+  .glass-dark {
+    @apply bg-slate-950/80 backdrop-blur-xl border border-white/5 shadow-2xl;
+  }
+
+  .glass-dark-premium {
+    @apply bg-[#0f172a]/40 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.3)];
+  }
+
+  .ribbed-background {
+    background: linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 40px 100%;
+  }
+
+  .bg-dark-hero {
+    background: radial-gradient(circle at 50% 0%, #1e293b 0%, #020617 100%);
+  }
+
+  .glass-card {
+    @apply bg-white/60 backdrop-blur-md border border-white/40 shadow-[0_10px_40px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_50px_-20px_rgba(59,130,246,0.15)] transition-all duration-500;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-[#11253E] via-[#1e3a68] to-blue-500 font-bold;
+  }
+
+  .bg-gradient-premium {
+    @apply bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/50;
+  }
+
+  .bg-blue-gradient {
+    @apply bg-gradient-to-r from-[#11253E] to-[#1e3a68];
+  }
+
+  .shadow-premium {
+    @apply shadow-[0_20px_50px_-20px_rgba(0,0,0,0.08)];
+  }
+
+  .shadow-glow-blue {
+    @apply shadow-[0_0_30px_-5px_rgba(59,130,246,0.4)];
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-15px); }
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.2),
+      transparent
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  .premium-scrollbar::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+
+  .premium-scrollbar::-webkit-scrollbar-track {
+    @apply bg-slate-100 rounded-full;
+  }
+
+  .premium-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-[#11253E] rounded-full border-2 border-slate-100 hover:bg-[#1e3a68] transition-colors;
+  }
+}
