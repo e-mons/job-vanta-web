@@ -31,7 +31,7 @@ const plans = [
   {
     name: "Pro",
     price: "29",
-    dodoProductId: "pdt_dummy_pro_product_id",
+    dodoProductId: "pdt_0Newfu26VwAPCKJBoT8z5",
     desc: "Most popular for active job seekers",
     features: [
       "Everything in Free",
@@ -49,7 +49,7 @@ const plans = [
   {
     name: "Enterprise",
     price: "99",
-    dodoProductId: "pdt_dummy_enterprise_product_id",
+    dodoProductId: "pdt_0NewgKeXYMkBEofXpxy9Z",
     desc: "Executive-level career management",
     features: [
       "Everything in Pro",
@@ -90,11 +90,11 @@ export default function PricingPage() {
   return (
     <main className="min-h-screen bg-white">
       <Navbar />
-      
+
       <section className="pt-40 pb-24 relative overflow-hidden">
         {/* Background Decor */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-6xl h-full bg-[radial-gradient(circle_at_50%_50%,rgba(59,130,246,0.03),transparent_70%)] pointer-events-none" />
-        
+
         <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-16 relative z-10">
           <div className="text-center max-w-3xl mx-auto mb-20">
             <motion.div
@@ -120,11 +120,10 @@ export default function PricingPage() {
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.1 }}
-                className={`relative p-8 md:p-10 rounded-[3rem] bg-white border transition-all duration-500 group ${
-                  plan.highlight 
-                    ? 'border-blue-200 shadow-2xl shadow-blue-600/10 md:scale-105 z-20' 
+                className={`relative p-8 md:p-10 rounded-[3rem] bg-white border transition-all duration-500 group ${plan.highlight
+                    ? 'border-blue-200 shadow-2xl shadow-blue-600/10 md:scale-105 z-20'
                     : 'border-slate-100 shadow-xl shadow-slate-200/50 hover:border-blue-100'
-                }`}
+                  }`}
               >
                 {plan.highlight && (
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-1.5 rounded-full bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg">
@@ -159,11 +158,10 @@ export default function PricingPage() {
                 <button
                   onClick={() => handlePlanClick(plan)}
                   disabled={isLoading}
-                  className={`w-full py-5 rounded-2xl font-black text-center transition-all block disabled:opacity-50 ${
-                    plan.highlight 
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 hover:bg-blue-700 hover:-translate-y-1' 
+                  className={`w-full py-5 rounded-2xl font-black text-center transition-all block disabled:opacity-50 ${plan.highlight
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 hover:bg-blue-700 hover:-translate-y-1'
                       : 'bg-slate-50 text-slate-900 hover:bg-slate-100'
-                  }`}
+                    }`}
                 >
                   {isLoading ? "Processing..." : plan.cta}
                 </button>
@@ -184,8 +182,8 @@ export default function PricingPage() {
                 <p className="text-slate-900 font-bold text-base sm:text-lg">Need a custom plan for your team?</p>
                 <p className="text-slate-500 text-xs sm:text-sm font-medium mt-1">Join 500+ companies hiring through JobVanta.</p>
               </div>
-              <Link 
-                href="/contact" 
+              <Link
+                href="/contact"
                 className="w-full md:w-auto px-8 py-4 rounded-2xl bg-slate-900 text-white font-bold hover:bg-slate-800 transition-colors shrink-0"
               >
                 Contact Sales

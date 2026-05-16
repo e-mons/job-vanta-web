@@ -95,7 +95,7 @@ export default function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalPr
                 <motion.button
                   whileHover={{ scale: 1.02, y: -2 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => createCheckoutSession('pdt_dummy_pro_product_id')}
+                  onClick={() => createCheckoutSession('pdt_0Newfu26VwAPCKJBoT8z5')}
                   disabled={isLoading}
                   className="relative group w-full py-5 rounded-2xl bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-3 shadow-[0_10px_30px_rgba(37,99,235,0.2)] overflow-hidden"
                 >
@@ -108,7 +108,7 @@ export default function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalPr
                     </>
                   )}
                 </motion.button>
-                
+
                 <div className="flex items-center justify-center gap-2 text-slate-400">
                   <CreditCard className="w-4 h-4" />
                   <span className="text-xs font-medium uppercase tracking-widest">Secure Checkout with Dodo Payments</span>
