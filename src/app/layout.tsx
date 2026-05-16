@@ -26,15 +26,18 @@ export const viewport = {
   userScalable: false,
 };
 
+import { Toaster } from "sonner";
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="scroll-smooth">
+    <html lang="en" className="scroll-smooth" data-scroll-behavior="smooth">
       <body className={`${inter.variable} ${outfit.variable} font-sans min-h-screen bg-white text-slate-900 antialiased`}>
         {children}
+        <Toaster richColors position="top-right" closeButton />
       </body>
     </html>
   );

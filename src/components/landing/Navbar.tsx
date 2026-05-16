@@ -8,25 +8,50 @@ import { useJobStore } from '@/store/useJobStore';
 import { useResumeStore } from '@/store/useResumeStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, ChevronRight, User, LogOut, LayoutDashboard, Search, FileText, Star, Briefcase } from 'lucide-react';
+import { useSubscriptionStore } from '@/store/useSubscription';
 
 interface NavbarProps {
   user?: any;
+  isDark?: boolean;
 }
 
-export default function Navbar({ user }: NavbarProps) {
-  const [isScrolled, setIsScrolled] = useState(false);
+export default function Navbar({ user: initialUser, isDark = false }: NavbarProps) {
+  const [user, setUser] = useState<any>(initialUser);
+  const [isScrolled, setIsScrolled] = useState(isDark);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const resetJobs = useJobStore(s => s.reset);
   const resetResumes = useResumeStore(s => s.reset);
+  const { status: subStatus, fetchSubscription } = useSubscriptionStore();
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 20);
+    if (!initialUser) {
+      const supabase = createClient();
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) {
+          setUser(user);
+          fetchSubscription();
+        }
+      });
+    } else {
+      fetchSubscription();
+    }
+  }, [initialUser, fetchSubscription]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (isDark) {
+        setIsScrolled(true);
+      } else {
+        setIsScrolled(window.scrollY > 20);
+      }
+    };
+    handleScroll(); // Initial check
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [isDark]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -47,9 +72,9 @@ export default function Navbar({ user }: NavbarProps) {
   };
 
   const navLinks = [
-    { name: 'Features', href: '#features' },
-    { name: 'Templates', href: '#templates' },
-    { name: 'Testimonials', href: '#testimonials' },
+    { name: 'Features', href: '/#features' },
+    { name: 'Templates', href: '/#templates' },
+    { name: 'Testimonials', href: '/#testimonials' },
   ];
 
   const authLinks = [
@@ -65,7 +90,7 @@ export default function Navbar({ user }: NavbarProps) {
         isScrolled ? 'py-4' : 'py-6'
       }`}
     >
-      <div className="max-w-7xl mx-auto px-8 sm:px-12 lg:px-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-16">
         <div 
           className={`relative flex items-center justify-between px-8 py-3 rounded-full transition-all duration-500 ${
             isScrolled ? 'glass shadow-premium' : 'bg-transparent'
@@ -80,7 +105,7 @@ export default function Navbar({ user }: NavbarProps) {
           </Link>
 
           {/* Desktop Nav - Centered */}
-          <div className="hidden md:flex items-center gap-2 absolute left-1/2 -translate-x-1/2">
+          <div className="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
             {navLinks.map((link) => (
               <Link 
                 key={link.name} 
@@ -139,9 +164,13 @@ export default function Navbar({ user }: NavbarProps) {
                             <div className="flex-1 min-w-0">
                               <p className="text-base font-black text-slate-900 truncate tracking-tight leading-none mb-1">{user.email?.split('@')[0]}</p>
                               <p className="text-[11px] font-bold text-slate-400 truncate uppercase tracking-widest">{user.email}</p>
-                              <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-600 text-[10px] font-black text-white uppercase tracking-wider shadow-lg shadow-blue-600/20">
-                                <Star className="w-3 h-3 fill-white" />
-                                Premium
+                              <div className={`mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-lg ${
+                                subStatus === 'active' || subStatus === 'trialing' 
+                                  ? 'bg-blue-600 text-white shadow-blue-600/20' 
+                                  : 'bg-slate-100 text-slate-500 shadow-slate-200/20'
+                              }`}>
+                                <Star className={`w-3 h-3 ${subStatus === 'active' || subStatus === 'trialing' ? 'fill-white' : 'fill-slate-400'}`} />
+                                {subStatus === 'active' || subStatus === 'trialing' ? 'Premium' : 'Free Plan'}
                               </div>
                             </div>
                           </div>

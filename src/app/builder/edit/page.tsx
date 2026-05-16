@@ -12,6 +12,7 @@ import { useJobStore } from '@/store/useJobStore';
 import UpgradeModal from '@/components/shared/UpgradeModal';
 import { z } from 'zod';
 import { createClient } from '@/utils/supabase/client';
+import { toast } from 'sonner';
 
 const resumeSchema = z.object({
   personalInfo: z.object({
@@ -103,7 +104,7 @@ function BuilderEditContent() {
       else throw new Error(result.error || 'Generation failed');
     } catch (err: any) {
       console.error(err);
-      alert(err.message || 'Failed to generate cover letter');
+      toast.error(err.message || 'Failed to generate cover letter');
     } finally {
       setIsGeneratingCL(false);
     }
@@ -145,7 +146,7 @@ function BuilderEditContent() {
 
   const handleATSAnalysis = async () => {
     if (!atsTargetJob.trim()) {
-      alert("Please enter a target job title to analyze against.");
+      toast.error("Please enter a target job title to analyze against.");
       return;
     }
 
@@ -177,7 +178,7 @@ function BuilderEditContent() {
       setAtsResult(responseData.data);
     } catch (err: any) {
       console.error(err);
-      alert(err.message || "An error occurred during analysis.");
+      toast.error(err.message || "An error occurred during analysis.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -198,7 +199,7 @@ function BuilderEditContent() {
       setIsATSModalOpen(false);
     } catch (err: any) {
       console.error('Optimization Error:', err);
-      alert(err.message || 'AI optimization failed. Please try again.');
+      toast.error(err.message || 'AI optimization failed. Please try again.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -314,7 +315,7 @@ function BuilderEditContent() {
       callback(result.improvedText);
     } catch (error: any) {
       console.error('AI Error:', error);
-      alert(error.message || 'AI improvement failed. Please try again.');
+      toast.error(error.message || 'AI improvement failed. Please try again.');
     }
   };
 
@@ -545,7 +546,7 @@ function BuilderEditContent() {
                         if (file) {
                           // Check size (max 2MB)
                           if (file.size > 2 * 1024 * 1024) {
-                            alert("Image must be smaller than 2MB.");
+                            toast.error("Image must be smaller than 2MB.");
                             return;
                           }
                           const reader = new FileReader();

@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { ChevronLeft, Sparkles, Loader2 } from 'lucide-react';
 import MobileBottomNav from '@/components/navigation/MobileBottomNav';
 import { useResumeStore } from '@/store/useResumeStore';
+import { toast } from 'sonner';
 
 function BuilderOptionsContent() {
   const router = useRouter();
@@ -80,7 +81,7 @@ function BuilderOptionsContent() {
 
     } catch (error) {
       console.error('Error:', error);
-      alert('Failed to parse resume. Please try starting from scratch.');
+      toast.error('Failed to parse resume. Please try starting from scratch.');
       setIsUploading(false);
       setUploadProgress(0);
     }

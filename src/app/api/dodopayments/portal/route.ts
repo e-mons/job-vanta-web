@@ -20,7 +20,7 @@ export async function POST() {
       .single();
 
     if (!subscription?.dodo_customer_id) {
-      return NextResponse.json({ error: "No active customer found" }, { status: 400 });
+      return NextResponse.json({ error: "No active subscription found. Please subscribe to a plan first." }, { status: 400 });
     }
 
     const portalSession = await dodo.customers.customerPortal.create(subscription.dodo_customer_id);

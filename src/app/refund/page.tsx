@@ -1,24 +1,24 @@
-import Link from "next/link";
-import { ChevronLeft, CreditCard, RefreshCcw, CheckCircle2, XCircle } from "lucide-react";
+import Navbar from "@/components/landing/Navbar";
+import Footer from "@/components/landing/Footer";
+import { CreditCard, RefreshCcw, CheckCircle2, XCircle } from "lucide-react";
 
 export default function RefundPage() {
   return (
-    <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans">
-      <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-xl shadow-slate-200/50 overflow-hidden border border-slate-100">
-        {/* Header */}
-        <div className="bg-[#11253E] p-8 text-white">
-          <Link href="/" className="inline-flex items-center text-slate-300 hover:text-white transition-colors mb-6 group">
-            <ChevronLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
-            Back to Home
-          </Link>
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-white/10 rounded-xl">
-              <RefreshCcw className="w-8 h-8 text-white" />
+    <div className="min-h-screen bg-slate-50 font-sans">
+      <Navbar isDark={true} />
+      <div className="max-w-3xl mx-auto pt-32 pb-24 px-4 sm:px-6 lg:px-8">
+        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 overflow-hidden border border-slate-100">
+          {/* Header */}
+          <div className="bg-[#11253E] p-10 text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+            <div className="flex items-center gap-4 mb-4 relative z-10">
+              <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md border border-white/10">
+                <RefreshCcw className="w-8 h-8 text-white" />
+              </div>
+              <h1 className="text-4xl font-black tracking-tight">Refund <span className="text-blue-400">Policy</span></h1>
             </div>
-            <h1 className="text-3xl font-bold font-outfit">Refund Policy</h1>
+            <p className="text-slate-400 font-medium relative z-10">Last updated: May 16, 2026</p>
           </div>
-          <p className="text-slate-300">Last updated: May 16, 2026</p>
-        </div>
 
         {/* Content */}
         <div className="p-8 sm:p-12">
@@ -81,14 +81,9 @@ export default function RefundPage() {
             </p>
           </section>
         </div>
-        
-        {/* Footer */}
-        <div className="bg-slate-50 border-t border-slate-100 p-8 text-center">
-          <p className="text-slate-500 text-sm">
-            &copy; 2026 JobVanta. All rights reserved.
-          </p>
-        </div>
       </div>
     </div>
+    <Footer />
+  </div>
   );
 }

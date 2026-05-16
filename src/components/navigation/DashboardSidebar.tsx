@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -57,7 +57,8 @@ export default function DashboardSidebar() {
   };
 
   return (
-    <aside className="w-72 bg-white border-r border-slate-100 hidden lg:flex flex-col p-8 fixed h-full z-50">
+    <aside className="w-72 bg-white border-r border-slate-100 hidden lg:flex flex-col fixed inset-y-0 left-0 z-50">
+      <div className="flex flex-col h-full p-8 overflow-y-auto premium-scrollbar">
       <Link href="/" className="flex items-center gap-3 mb-12">
         <img src="/logo.png" alt="JobVanta Logo" className="w-10 h-10 rounded-xl object-cover shadow-sm" />
         <span className="text-xl font-black text-[#11253E] tracking-tight">JobVanta</span>
@@ -100,8 +101,9 @@ export default function DashboardSidebar() {
 
       <div className="mt-auto pt-8">
         <div className="glass p-6 rounded-[2rem] border border-blue-100 bg-blue-50/50">
-          <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-2">
-            {subStatus === 'active' || subStatus === 'trialing' ? 'Premium Plan' : 'Standard Plan'}
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Your Plan</p>
+          <p className="text-sm font-black text-slate-900 leading-tight mb-4">
+            {subStatus === 'active' || subStatus === 'trialing' ? 'Premium Plan' : 'Free Plan'}
           </p>
           <p className="text-sm font-bold text-slate-900 mb-4">
             {subStatus === 'active' || subStatus === 'trialing' 
@@ -112,6 +114,7 @@ export default function DashboardSidebar() {
             {subStatus === 'active' || subStatus === 'trialing' ? 'View Details' : 'Upgrade Now'}
           </Link>
         </div>
+      </div>
       </div>
     </aside>
   );

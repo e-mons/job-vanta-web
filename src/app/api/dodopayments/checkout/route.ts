@@ -40,7 +40,14 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ url: session.checkout_url });
   } catch (err: any) {
-    console.error("Dodo checkout error:", err);
-    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
+    console.error("Dodo checkout error:", {
+      status: err.status,
+      error: err.error,
+      message: err.message
+    });
+    return NextResponse.json({ 
+      error: err.error?.error || err.message || 'Internal Server Error',
+      details: err.error
+    }, { status: err.status || 500 });
   }
 }

@@ -14,6 +14,7 @@ import { useSearchParams } from 'next/navigation';
 import { TEMPLATES, CATEGORIES } from '@/constants/templates';
 import HTMLPreview from '@/components/builder/Preview/HTMLPreview';
 import { useSubscriptionStore } from '@/store/useSubscription';
+import { toast } from 'sonner';
 
 
 
@@ -58,7 +59,7 @@ function BuilderContent() {
 
   const handleSelect = (id: string) => {
     if (!isPremium() && userResumes.length >= 2) {
-      alert("Free accounts are limited to 2 resumes. Please upgrade to Premium or delete an existing resume to create a new one.");
+      toast.error("Free accounts are limited to 2 resumes. Please upgrade to Premium or delete an existing resume to create a new one.");
       return;
     }
     setTemplateId(id);
@@ -167,7 +168,16 @@ function BuilderContent() {
                         <button 
                           onClick={(e) => {
                             e.preventDefault();
-                            if(confirm('Are you sure you want to delete this resume?')) deleteResume(resume.id);
+                            toast.warning('Are you sure you want to delete this resume?', {
+                              description: 'This action cannot be undone.',
+                              action: {
+                                label: 'Delete',
+                                onClick: () => {
+                                  deleteResume(resume.id);
+                                  toast.success('Resume deleted successfully');
+                                }
+                              }
+                            });
                           }}
                           className="p-2 text-slate-300 hover:text-red-500 transition-colors"
                         >

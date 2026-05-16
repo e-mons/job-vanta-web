@@ -75,8 +75,12 @@ export default function DashboardHeader() {
           onClick={() => setIsOpen(!isOpen)}
           className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-50 border border-slate-100 active:scale-95 transition-all"
         >
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-xs font-black shadow-md shadow-blue-600/20">
-            {user?.email?.[0].toUpperCase() || "?"}
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-xs font-black shadow-md shadow-blue-600/20 overflow-hidden">
+            {user?.user_metadata?.avatar_url ? (
+              <img src={user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              user?.email?.[0].toUpperCase() || "?"
+            )}
           </div>
           <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
         </button>
@@ -93,8 +97,12 @@ export default function DashboardHeader() {
                 {/* Profile Header */}
                 <div className="p-6 bg-slate-50/50 border-b border-slate-100">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-blue-600 text-lg font-black shadow-sm border border-slate-100">
-                      {user?.email?.[0].toUpperCase() || "?"}
+                    <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-blue-600 text-lg font-black shadow-sm border border-slate-100 overflow-hidden">
+                      {user?.user_metadata?.avatar_url ? (
+                        <img src={user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        user?.email?.[0].toUpperCase() || "?"
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-black text-slate-900 truncate tracking-tight">{user?.email?.split('@')[0]}</p>

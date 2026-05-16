@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import UpgradeModal from "@/components/shared/UpgradeModal";
 import { z } from "zod";
+import { toast } from "sonner";
 
 const searchSchema = z.string().min(2, "Please enter at least 2 characters to search.");
 
@@ -55,7 +56,7 @@ export default function SearchBar() {
 
     const skills = resumeData.skills.filter((s) => s.trim() !== "");
     if (skills.length === 0) {
-      alert("Add skills to your resume first to use AI search!");
+      toast.error("Add skills to your resume first to use AI search!");
       return;
     }
     searchByResume(skills);

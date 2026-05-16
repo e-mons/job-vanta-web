@@ -21,15 +21,17 @@ import {
 } from "lucide-react";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { createClient } from "@/utils/supabase/client";
+import { PLANS } from "@/config/plans";
 import { useSubscriptionStore } from "@/store/useSubscription";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'profile' | 'subscription' | 'security' | 'notifications'>('profile');
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const { status: subStatus, fetchSubscription } = useSubscriptionStore();
+  const { status: subStatus, planId, currentPeriodEnd, fetchSubscription } = useSubscriptionStore();
   const router = useRouter();
 
   // Form states
@@ -38,7 +40,8 @@ export default function SettingsPage() {
     email: "",
     phone: "",
     location: "",
-    bio: ""
+    bio: "",
+    avatarUrl: ""
   });
 
   useEffect(() => {
@@ -52,7 +55,8 @@ export default function SettingsPage() {
           email: user.email || "",
           phone: user.user_metadata?.phone || "",
           location: user.user_metadata?.location || "",
-          bio: user.user_metadata?.bio || ""
+          bio: user.user_metadata?.bio || "",
+          avatarUrl: user.user_metadata?.avatar_url || ""
         });
       }
       setIsLoading(false);
@@ -60,6 +64,45 @@ export default function SettingsPage() {
     getProfile();
     fetchSubscription();
   }, [fetchSubscription]);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsSaving(true);
+    const supabase = createClient();
+    
+    // 1. Upload to Supabase Storage
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+    const { data, error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(fileName, file);
+
+    if (uploadError) {
+      toast.error("Error uploading image. Please ensure an 'avatars' bucket exists in your Supabase storage.");
+      setIsSaving(false);
+      return;
+    }
+
+    // 2. Get Public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(fileName);
+
+    // 3. Update User Metadata
+    const { error: updateError } = await supabase.auth.updateUser({
+      data: { avatar_url: publicUrl }
+    });
+
+    if (updateError) {
+      toast.error(updateError.message);
+    } else {
+      setProfileForm(prev => ({ ...prev, avatarUrl: publicUrl }));
+      toast.success("Avatar updated successfully!");
+    }
+    setIsSaving(false);
+  };
 
   const handleUpdateProfile = async () => {
     setIsSaving(true);
@@ -69,14 +112,73 @@ export default function SettingsPage() {
         full_name: profileForm.fullName,
         phone: profileForm.phone,
         location: profileForm.location,
-        bio: profileForm.bio
+        bio: profileForm.bio,
+        avatar_url: profileForm.avatarUrl
       }
     });
 
     if (error) {
-      alert(error.message);
+      toast.error(error.message);
     } else {
-      alert("Profile updated successfully!");
+      toast.success("Profile updated successfully!");
+    }
+    setIsSaving(false);
+  };
+
+  const handleChangePassword = async () => {
+    const supabase = createClient();
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Password reset email sent!");
+    }
+  };
+
+  const handleDeactivateAccount = async () => {
+    toast.warning("Are you sure you want to deactivate your account?", {
+      description: "This action is irreversible.",
+      action: {
+        label: "Deactivate",
+        onClick: async () => {
+          const supabase = createClient();
+          toast.info("Account deactivation requested. Our team will process your request.");
+          await supabase.auth.signOut();
+          router.push("/");
+        }
+      },
+      cancel: {
+        label: "Cancel",
+        onClick: () => {}
+      }
+    });
+  };
+
+  const [notificationPrefs, setNotificationPrefs] = useState<any>({
+    email_notifications: true,
+    marketing_emails: true,
+    browser_notifications: true,
+    sms_alerts: false
+  });
+
+  useEffect(() => {
+    if (user?.user_metadata?.notifications) {
+      setNotificationPrefs(user.user_metadata.notifications);
+    }
+  }, [user]);
+
+  const handleSaveNotifications = async () => {
+    setIsSaving(true);
+    const supabase = createClient();
+    const { error } = await supabase.auth.updateUser({
+      data: { notifications: notificationPrefs }
+    });
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Notification settings saved!");
     }
     setIsSaving(false);
   };
@@ -86,15 +188,15 @@ export default function SettingsPage() {
       const response = await fetch('/api/dodopayments/portal', {
         method: 'POST',
       });
-      const { url, error } = await response.json();
-      if (url) {
-        window.location.href = url;
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
       } else {
-        throw new Error(error || "No URL returned");
+        throw new Error(data.error || "No URL returned");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Portal error:", err);
-      alert("Failed to open billing portal.");
+      toast.error(err.message || "Failed to open billing portal.");
     }
   };
 
@@ -153,20 +255,31 @@ export default function SettingsPage() {
                     <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
                     <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
                       <div className="relative">
-                        <div className="w-32 h-32 rounded-[2.5rem] bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-4xl font-black shadow-2xl shadow-blue-500/30">
-                          {user?.email?.[0].toUpperCase()}
+                        <div className="w-32 h-32 rounded-[2.5rem] bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-4xl font-black shadow-2xl shadow-blue-500/30 overflow-hidden">
+                          {profileForm.avatarUrl ? (
+                            <img src={profileForm.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                          ) : (
+                            user?.email?.[0].toUpperCase()
+                          )}
                         </div>
-                        <button className="absolute -bottom-2 -right-2 w-10 h-10 bg-white rounded-xl shadow-xl border border-slate-100 flex items-center justify-center text-slate-500 hover:text-blue-600 transition-all hover:scale-110 active:scale-95">
+                        <label className="absolute -bottom-2 -right-2 w-10 h-10 bg-white rounded-xl shadow-xl border border-slate-100 flex items-center justify-center text-slate-500 hover:text-blue-600 transition-all hover:scale-110 active:scale-95 cursor-pointer">
                           <Camera className="w-5 h-5" />
-                        </button>
+                          <input type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} />
+                        </label>
                       </div>
                       <div className="text-center md:text-left">
                         <h2 className="text-2xl font-black text-slate-900 tracking-tight">{profileForm.fullName || user?.email?.split('@')[0]}</h2>
                         <p className="text-slate-500 font-medium mb-4">{user?.email}</p>
                         <div className="flex flex-wrap justify-center md:justify-start gap-3">
-                          <span className="px-4 py-1.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-wider border border-blue-100 flex items-center gap-2">
-                            <Star className="w-3 h-3 fill-blue-600" /> Premium Member
-                          </span>
+                          {subStatus === 'active' || subStatus === 'trialing' ? (
+                            <span className="px-4 py-1.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-wider border border-blue-100 flex items-center gap-2">
+                              <Star className="w-3 h-3 fill-blue-600" /> Premium Member
+                            </span>
+                          ) : (
+                            <span className="px-4 py-1.5 rounded-full bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-wider border border-slate-100 flex items-center gap-2">
+                              Free Plan
+                            </span>
+                          )}
                           <span className="px-4 py-1.5 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-wider border border-emerald-100 flex items-center gap-2">
                             <CheckCircle2 className="w-3 h-3" /> Verified Account
                           </span>
@@ -268,15 +381,17 @@ export default function SettingsPage() {
                         </div>
                         <div>
                           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-400 leading-tight">Current Plan</p>
-                          <h2 className="text-3xl font-black tracking-tight leading-tight">Premium Professional</h2>
+                          <h2 className="text-3xl font-black tracking-tight leading-tight">
+                            {subStatus === 'none' ? 'Free Plan' : (PLANS.find(p => p.priceId === planId)?.name || 'Pro') + ' Plan'}
+                          </h2>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-                        {[
-                          { label: 'Status', value: subStatus?.toUpperCase() || 'ACTIVE', color: 'text-emerald-400' },
-                          { label: 'Next Billing', value: 'June 12, 2026', color: 'text-white' },
-                          { label: 'Amount', value: '$19.00 / mo', color: 'text-white' },
+                         {[
+                          { label: 'Status', value: subStatus === 'none' ? 'FREE' : subStatus?.toUpperCase(), color: subStatus === 'none' ? 'text-slate-400' : 'text-emerald-400' },
+                          { label: 'Next Billing', value: currentPeriodEnd ? new Date(currentPeriodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '—', color: 'text-white' },
+                          { label: 'Amount', value: subStatus === 'none' ? '$0.00' : `$${PLANS.find(p => p.priceId === planId)?.price || '29'}.00 / mo`, color: 'text-white' },
                         ].map((stat, i) => (
                           <div key={i} className="p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-sm">
                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">{stat.label}</p>
@@ -286,13 +401,25 @@ export default function SettingsPage() {
                       </div>
 
                       <div className="flex flex-col sm:flex-row gap-4">
+                        {subStatus === 'none' ? (
+                          <button 
+                            onClick={() => router.push('/pricing')}
+                            className="px-8 py-4 bg-blue-600 text-white rounded-[20px] font-black text-sm hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-xl shadow-blue-500/20"
+                          >
+                            <Star className="w-5 h-5 fill-white" /> Upgrade to Pro
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={handleManageBilling}
+                            className="px-8 py-4 bg-white text-slate-900 rounded-[20px] font-black text-sm hover:bg-slate-100 transition-all flex items-center justify-center gap-2"
+                          >
+                            <CreditCard className="w-5 h-5" /> Manage Billing
+                          </button>
+                        )}
                         <button 
-                          onClick={handleManageBilling}
-                          className="px-8 py-4 bg-white text-slate-900 rounded-[20px] font-black text-sm hover:bg-slate-100 transition-all flex items-center justify-center gap-2"
+                          onClick={() => router.push('/pricing')}
+                          className="px-8 py-4 bg-white/10 hover:bg-white/20 text-white rounded-[20px] font-black text-sm transition-all border border-white/10"
                         >
-                          <CreditCard className="w-5 h-5" /> Manage Billing
-                        </button>
-                        <button className="px-8 py-4 bg-white/10 hover:bg-white/20 text-white rounded-[20px] font-black text-sm transition-all border border-white/10">
                           View Pricing Plans
                         </button>
                       </div>
@@ -302,14 +429,20 @@ export default function SettingsPage() {
                   <div className="p-10 rounded-[3rem] bg-white border border-slate-200/60 shadow-2xl shadow-slate-200/50">
                     <h3 className="text-xl font-black text-slate-900 mb-8 tracking-tight">Plan Features</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {[
+                      {(subStatus === 'none' ? [
+                        'ATS-Friendly Resume Builder',
+                        'Limited AI Suggestions',
+                        'Job Search & Matching',
+                        '3 Saved Resumes',
+                        'Basic Support'
+                      ] : [
                         'Unlimited AI Resume Tailoring',
                         'Real-time ATS Score Analysis',
                         'Unlimited PDF Downloads',
                         'AI Cover Letter Generation',
                         'Priority Customer Support',
                         'Advanced Career Roadmap AI',
-                      ].map((feature, i) => (
+                      ]).map((feature, i) => (
                         <div key={i} className="flex items-center gap-3">
                           <div className="w-6 h-6 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
                             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
@@ -342,14 +475,17 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="space-y-6">
-                      <div className="flex items-center justify-between p-6 rounded-[24px] bg-slate-50 hover:bg-white hover:shadow-xl hover:shadow-slate-200 border border-transparent hover:border-slate-200 transition-all cursor-pointer group">
+                      <div 
+                        onClick={handleChangePassword}
+                        className="flex items-center justify-between p-6 rounded-[24px] bg-slate-50 hover:bg-white hover:shadow-xl hover:shadow-slate-200 border border-transparent hover:border-slate-200 transition-all cursor-pointer group"
+                      >
                         <div className="flex items-center gap-4">
                           <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-hover:text-blue-600 group-hover:border-blue-200 transition-all">
                             <Shield className="w-5 h-5" />
                           </div>
                           <div>
                             <p className="text-sm font-black text-slate-900">Change Password</p>
-                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Last updated 3 months ago</p>
+                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Send reset email to {user?.email}</p>
                           </div>
                         </div>
                         <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-600 transition-all" />
@@ -362,17 +498,107 @@ export default function SettingsPage() {
                           </div>
                           <div>
                             <p className="text-sm font-black text-slate-900">Two-Factor Authentication</p>
-                            <p className="text-[11px] font-bold text-rose-500 uppercase tracking-widest mt-0.5">Currently Disabled</p>
+                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                              {user?.user_metadata?.two_factor_enabled ? 'Enabled' : 'Disabled'}
+                            </p>
                           </div>
                         </div>
-                        <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-600 transition-all" />
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            className="sr-only peer" 
+                            checked={user?.user_metadata?.two_factor_enabled || false}
+                            onChange={async (e) => {
+                              const supabase = createClient();
+                              const { error } = await supabase.auth.updateUser({
+                                data: { two_factor_enabled: e.target.checked }
+                              });
+                              if (error) {
+                                toast.error(error.message);
+                              } else {
+                                setUser({ ...user, user_metadata: { ...user.user_metadata, two_factor_enabled: e.target.checked } });
+                                toast.success(`2FA ${e.target.checked ? 'Enabled' : 'Disabled'} successfully!`);
+                              }
+                            }}
+                          />
+                          <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
                       </div>
 
                       <div className="pt-10">
-                        <button className="flex items-center gap-3 px-8 py-4 text-rose-500 font-black text-xs uppercase tracking-[0.2em] hover:bg-rose-50 rounded-2xl transition-all">
+                        <button 
+                          onClick={handleDeactivateAccount}
+                          className="flex items-center gap-3 px-8 py-4 text-rose-500 font-black text-xs uppercase tracking-[0.2em] hover:bg-rose-50 rounded-2xl transition-all"
+                        >
                           <LogOut className="w-4 h-4" /> Deactivate Account
                         </button>
                       </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === 'notifications' && (
+                <motion.div
+                  key="notifications"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-8"
+                >
+                  <div className="p-10 rounded-[3rem] bg-white border border-slate-200/60 shadow-2xl shadow-slate-200/50">
+                    <div className="flex items-center gap-4 mb-10">
+                      <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center shadow-sm">
+                        <Bell className="w-6 h-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-black text-slate-900 tracking-tight">Notification Preferences</h3>
+                        <p className="text-sm font-medium text-slate-500">Control how and when you want to be notified.</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      {[
+                        { title: 'Email Notifications', desc: 'Receive daily job alerts and application updates.', key: 'email_notifications' },
+                        { title: 'Marketing Emails', desc: 'Stay updated with new features and career tips.', key: 'marketing_emails' },
+                        { title: 'Browser Notifications', desc: 'Get real-time alerts when recruiters view your profile.', key: 'browser_notifications' },
+                        { title: 'SMS Alerts', desc: 'Instant text alerts for high-priority job matches.', key: 'sms_alerts', pro: true }
+                      ].map((item) => (
+                        <div key={item.key} className="flex items-center justify-between p-6 rounded-[24px] bg-slate-50 border border-transparent transition-all">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-1">
+                              <p className="text-sm font-black text-slate-900">{item.title}</p>
+                              {item.pro && (
+                                <span className="px-2 py-0.5 rounded-full bg-blue-600 text-[8px] font-black text-white uppercase tracking-widest">Pro</span>
+                              )}
+                            </div>
+                            <p className="text-xs font-bold text-slate-400 leading-relaxed">{item.desc}</p>
+                          </div>
+                          <div className="ml-6">
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input 
+                                type="checkbox" 
+                                className="sr-only peer" 
+                                checked={notificationPrefs[item.key]} 
+                                onChange={(e) => setNotificationPrefs({ ...notificationPrefs, [item.key]: e.target.checked })}
+                                disabled={item.pro && subStatus === 'none'}
+                              />
+                              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="pt-10 border-t border-slate-100 mt-10 flex justify-end">
+                      <button 
+                        onClick={handleSaveNotifications}
+                        disabled={isSaving}
+                        className="flex items-center gap-3 px-10 py-5 bg-blue-600 text-white rounded-[20px] font-black text-sm hover:bg-blue-700 shadow-2xl shadow-blue-500/30 transition-all active:scale-95 disabled:opacity-50"
+                      >
+                        {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                        Save Preferences
+                      </button>
                     </div>
                   </div>
                 </motion.div>

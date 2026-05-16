@@ -16,6 +16,7 @@ interface SubscriptionState {
   planId: string | null;
   isLoading: boolean;
   error: string | null;
+  currentPeriodEnd: string | null;
   fetchSubscription: () => Promise<void>;
   isPremium: () => boolean;
   createCheckoutSession: (priceId: string) => Promise<void>;
@@ -26,6 +27,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   planId: null,
   isLoading: false,
   error: null,
+  currentPeriodEnd: null,
 
   fetchSubscription: async () => {
     set({ isLoading: true, error: null });
@@ -40,16 +42,21 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
       const { data, error } = await supabase
         .from('subscriptions')
-        .select('status, plan_id')
+        .select('status, plan_id, current_period_end')
         .eq('user_id', user.id)
         .single();
 
       if (error && error.code !== 'PGRST116') throw error; // PGRST116 is "No rows found"
 
       if (data) {
-        set({ status: data.status as SubscriptionStatus, planId: data.plan_id, isLoading: false });
+        set({ 
+          status: data.status as SubscriptionStatus, 
+          planId: data.plan_id, 
+          currentPeriodEnd: data.current_period_end,
+          isLoading: false 
+        });
       } else {
-        set({ status: 'none', planId: null, isLoading: false });
+        set({ status: 'none', planId: null, currentPeriodEnd: null, isLoading: false });
       }
     } catch (err: any) {
       set({ error: err.message, isLoading: false });

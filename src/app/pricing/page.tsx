@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Zap, Crown, Shield, Rocket, Sparkles, MessageCircle } from 'lucide-react';
 import Link from 'next/link';
@@ -9,69 +10,22 @@ import Footer from '@/components/landing/Footer';
 import { createClient } from '@/utils/supabase/client';
 import { useSubscriptionStore } from '@/store/useSubscription';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
-const plans = [
-  {
-    name: "Free",
-    price: "0",
-    dodoProductId: null,
-    desc: "Perfect for exploring the platform",
-    features: [
-      "ATS-Friendly Resume Builder",
-      "Limited AI Suggestions",
-      "Job Search & Matching",
-      "3 Saved Resumes",
-      "Basic Support"
-    ],
-    cta: "Start for Free",
-    href: "/signup",
-    highlight: false,
-    icon: <Shield className="w-6 h-6 text-slate-400" />
-  },
-  {
-    name: "Pro",
-    price: "29",
-    dodoProductId: "pdt_0Newfu26VwAPCKJBoT8z5",
-    desc: "Most popular for active job seekers",
-    features: [
-      "Everything in Free",
-      "Unlimited AI Resume Optimization",
-      "Priority Job Matching",
-      "Unlimited Resume Storage",
-      "Priority Email Support",
-      "Advanced Career Insights"
-    ],
-    cta: "Get Started Pro",
-    href: "/signup?plan=pro",
-    highlight: true,
-    icon: <Zap className="w-6 h-6 text-blue-500" />
-  },
-  {
-    name: "Enterprise",
-    price: "99",
-    dodoProductId: "pdt_0NewgKeXYMkBEofXpxy9Z",
-    desc: "Executive-level career management",
-    features: [
-      "Everything in Pro",
-      "Dedicated Career Coach (AI)",
-      "Portfolio Website Builder",
-      "Direct Recruiter Network",
-      "24/7 Premium Support",
-      "Interview Coaching (AI Video)"
-    ],
-    cta: "Go Enterprise",
-    href: "/signup?plan=enterprise",
-    highlight: false,
-    icon: <Crown className="w-6 h-6 text-amber-500" />
-  }
-];
+import { PLANS } from '@/config/plans';
 
 export default function PricingPage() {
   const router = useRouter();
-  const { createCheckoutSession, isLoading } = useSubscriptionStore();
+  const { createCheckoutSession, isLoading, error: subError } = useSubscriptionStore();
+  
+  useEffect(() => {
+    if (subError) {
+      toast.error(subError);
+    }
+  }, [subError]);
 
-  const handlePlanClick = async (plan: typeof plans[0]) => {
-    if (!plan.dodoProductId) {
+  const handlePlanClick = async (plan: typeof PLANS[0]) => {
+    if (!plan.priceId) {
       router.push(plan.href);
       return;
     }
@@ -84,12 +38,21 @@ export default function PricingPage() {
       return;
     }
 
-    await createCheckoutSession(plan.dodoProductId);
+    await createCheckoutSession(plan.priceId);
+  };
+
+  const getIcon = (name: string, highlighted: boolean) => {
+    switch (name) {
+      case 'Shield': return <Shield className={`w-6 h-6 ${highlighted ? 'text-blue-500' : 'text-slate-400'}`} />;
+      case 'Zap': return <Zap className={`w-6 h-6 ${highlighted ? 'text-blue-500' : 'text-slate-400'}`} />;
+      case 'Crown': return <Crown className={`w-6 h-6 ${highlighted ? 'text-blue-500' : 'text-slate-400'}`} />;
+      default: return <Shield className="w-6 h-6 text-slate-400" />;
+    }
   };
 
   return (
     <main className="min-h-screen bg-white">
-      <Navbar />
+      <Navbar isDark={true} />
 
       <section className="pt-40 pb-24 relative overflow-hidden">
         {/* Background Decor */}
@@ -114,18 +77,18 @@ export default function PricingPage() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 items-start">
-            {plans.map((plan, i) => (
+            {PLANS.map((plan, i) => (
               <motion.div
                 key={plan.name}
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.1 }}
-                className={`relative p-8 md:p-10 rounded-[3rem] bg-white border transition-all duration-500 group ${plan.highlight
+                className={`relative p-8 md:p-10 rounded-[3rem] bg-white border transition-all duration-500 group ${plan.highlighted
                     ? 'border-blue-200 shadow-2xl shadow-blue-600/10 md:scale-105 z-20'
                     : 'border-slate-100 shadow-xl shadow-slate-200/50 hover:border-blue-100'
                   }`}
               >
-                {plan.highlight && (
+                {plan.highlighted && (
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-1.5 rounded-full bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg">
                     Most Popular
                   </div>
@@ -133,10 +96,10 @@ export default function PricingPage() {
 
                 <div className="mb-8">
                   <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center mb-6 group-hover:bg-blue-50 transition-colors">
-                    {plan.icon}
+                    {getIcon(plan.iconName, plan.highlighted)}
                   </div>
                   <h3 className="text-2xl font-black text-slate-900 mb-2">{plan.name}</h3>
-                  <p className="text-sm text-slate-500 font-medium">{plan.desc}</p>
+                  <p className="text-sm text-slate-500 font-medium">{plan.description}</p>
                 </div>
 
                 <div className="mb-10 flex items-baseline gap-1">
@@ -158,7 +121,7 @@ export default function PricingPage() {
                 <button
                   onClick={() => handlePlanClick(plan)}
                   disabled={isLoading}
-                  className={`w-full py-5 rounded-2xl font-black text-center transition-all block disabled:opacity-50 ${plan.highlight
+                  className={`w-full py-5 rounded-2xl font-black text-center transition-all block disabled:opacity-50 ${plan.highlighted
                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 hover:bg-blue-700 hover:-translate-y-1'
                       : 'bg-slate-50 text-slate-900 hover:bg-slate-100'
                     }`}

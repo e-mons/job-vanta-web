@@ -20,6 +20,7 @@ export async function POST(req: Request) {
         'webhook-signature': signature,
         'webhook-timestamp': timestamp,
       },
+      key: process.env.DODO_WEBHOOK_SECRET,
     });
   } catch (err: any) {
     console.error(`Webhook signature verification failed: ${err.message}`);
@@ -27,6 +28,10 @@ export async function POST(req: Request) {
   }
 
   const supabase = createAdminClient();
+  console.log(`[Dodo Webhook] Received event: ${event.type}`, { 
+    id: event.data?.payment_id || event.data?.subscription_id,
+    customer: event.data?.customer_id 
+  });
 
   try {
     switch (event.type) {
@@ -41,7 +46,7 @@ export async function POST(req: Request) {
         if (!userId) break;
 
         // Note: Dodo uses slightly different objects, assuming standard subscription event shape
-        const planId = event.data.product_id;
+        const planId = event.data.product_id || (event.data.product_cart && event.data.product_cart[0]?.product_id);
         
         // Handle subscription upsert
         if (subscriptionId) {

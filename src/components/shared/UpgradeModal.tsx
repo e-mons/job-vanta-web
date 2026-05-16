@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, Sparkles, Zap, ShieldCheck, Rocket, CreditCard } from "lucide-react";
 import { useSubscriptionStore } from "@/store/useSubscription";
+import { PLANS } from "@/config/plans";
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ const FEATURES = [
 
 export default function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
   const { createCheckoutSession, isLoading } = useSubscriptionStore();
+  const proPlan = PLANS.find(p => p.id === 'pro')!;
 
   return (
     <AnimatePresence>
@@ -52,7 +54,7 @@ export default function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalPr
                     <Sparkles className="w-3.5 h-3.5" />
                     Premium Experience
                   </div>
-                  <h2 className="text-3xl font-bold tracking-tight text-slate-900">Upgrade to Pro</h2>
+                  <h2 className="text-3xl font-bold tracking-tight text-slate-900">Upgrade to {proPlan.name}</h2>
                 </div>
                 <button
                   onClick={onClose}
@@ -70,11 +72,11 @@ export default function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalPr
               )}
 
               <p className="text-slate-500 mb-10 leading-relaxed">
-                Unlock high-performance tools designed to give you a competitive edge in your career journey.
+                {proPlan.description}
               </p>
 
               <div className="space-y-5 mb-12">
-                {FEATURES.map((feature, i) => (
+                {proPlan.features.slice(0, 4).map((feature, i) => (
                   <motion.div
                     key={i}
                     initial={{ opacity: 0, x: -10 }}
@@ -83,9 +85,12 @@ export default function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalPr
                     className="flex items-center gap-4 group"
                   >
                     <div className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 group-hover:bg-blue-50 group-hover:border-blue-100 transition-colors">
-                      {feature.icon}
+                      {i === 0 && <Rocket className="w-5 h-5 text-blue-600" />}
+                      {i === 1 && <Sparkles className="w-5 h-5 text-indigo-600" />}
+                      {i === 2 && <Zap className="w-5 h-5 text-amber-600" />}
+                      {i === 3 && <ShieldCheck className="w-5 h-5 text-emerald-600" />}
                     </div>
-                    <span className="text-slate-700 font-semibold">{feature.text}</span>
+                    <span className="text-slate-700 font-semibold">{feature}</span>
                     <Check className="w-5 h-5 text-emerald-500 ml-auto" />
                   </motion.div>
                 ))}
@@ -95,7 +100,7 @@ export default function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalPr
                 <motion.button
                   whileHover={{ scale: 1.02, y: -2 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => createCheckoutSession('pdt_0Newfu26VwAPCKJBoT8z5')}
+                  onClick={() => createCheckoutSession(proPlan.priceId!)}
                   disabled={isLoading}
                   className="relative group w-full py-5 rounded-2xl bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-3 shadow-[0_10px_30px_rgba(37,99,235,0.2)] overflow-hidden"
                 >
@@ -104,7 +109,7 @@ export default function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalPr
                   ) : (
                     <>
                       <Zap className="w-5 h-5 fill-white" />
-                      Upgrade Now — $19.99/mo
+                      Upgrade Now — ${proPlan.price}/mo
                     </>
                   )}
                 </motion.button>

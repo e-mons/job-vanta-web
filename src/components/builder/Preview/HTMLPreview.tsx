@@ -3,6 +3,7 @@
 import React from 'react';
 import { ResumeData, useResumeStore } from '@/store/useResumeStore';
 import { Mail, Phone, MapPin, Globe, Award, GraduationCap } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface HTMLPreviewProps {
   data: ResumeData;
@@ -58,7 +59,7 @@ const PhotoUploadWrapper = ({ children }: { children: React.ReactNode }) => {
           const file = e.target.files?.[0];
           if (file) {
             if (file.size > 2 * 1024 * 1024) {
-              alert("Image must be smaller than 2MB.");
+              toast.error("Image must be smaller than 2MB.");
               return;
             }
             const reader = new FileReader();

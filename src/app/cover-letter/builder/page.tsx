@@ -8,6 +8,7 @@ import { createClient } from '@/utils/supabase/client';
 import { useSubscriptionStore } from '@/store/useSubscription';
 import { useJobStore } from '@/store/useJobStore';
 import UpgradeModal from '@/components/shared/UpgradeModal';
+import { toast } from 'sonner';
 
 function CoverLetterBuilderContent() {
   const router = useRouter();
@@ -93,7 +94,7 @@ function CoverLetterBuilderContent() {
     }
 
     if (!targetJobTitle || !companyName) {
-      alert("Please enter the target job title and company name.");
+      toast.error("Please enter the target job title and company name.");
       return;
     }
 
@@ -121,7 +122,7 @@ function CoverLetterBuilderContent() {
       setContent(data.data.content);
     } catch (error: any) {
       console.error(error);
-      alert(error.message);
+      toast.error(error.message);
     } finally {
       setIsGenerating(false);
     }
@@ -152,7 +153,7 @@ function CoverLetterBuilderContent() {
       }
     } catch (error: any) {
       console.error(error);
-      alert("Failed to save cover letter.");
+      toast.error("Failed to save cover letter.");
     } finally {
       setIsSaving(false);
     }
