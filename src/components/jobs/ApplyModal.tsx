@@ -51,8 +51,6 @@ export default function ApplyModal({ job, resume, isOpen, onClose, onSuccess }: 
         .insert({
           user_id: user.id,
           resume_id: resume.id,
-          job_title: job.title,
-          company: job.company,
           status: "pending",
           metadata: job
         })
@@ -110,7 +108,7 @@ export default function ApplyModal({ job, resume, isOpen, onClose, onSuccess }: 
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-2xl bg-white rounded-[40px] shadow-2xl overflow-hidden"
+            className="relative w-full max-w-2xl bg-white rounded-[40px] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
           >
             {isSuccess ? (
               <div className="p-16 text-center space-y-8">
@@ -137,7 +135,7 @@ export default function ApplyModal({ job, resume, isOpen, onClose, onSuccess }: 
               </div>
             ) : (
               <>
-                <div className="p-10 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div className="p-10 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 flex-shrink-0">
                   <div className="flex items-center gap-4">
                     <div className="p-3 rounded-2xl bg-blue-600 text-white shadow-xl shadow-blue-600/20">
                       <Send className="w-6 h-6" />
@@ -155,7 +153,7 @@ export default function ApplyModal({ job, resume, isOpen, onClose, onSuccess }: 
                   </button>
                 </div>
 
-                <div className="p-10 space-y-10">
+                <div className="p-10 space-y-10 overflow-y-auto premium-scrollbar-light flex-1">
                   {/* Selected Resume */}
                   <div className="space-y-4">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
@@ -213,34 +211,34 @@ export default function ApplyModal({ job, resume, isOpen, onClose, onSuccess }: 
                       <p className="text-sm font-bold">{error}</p>
                     </div>
                   )}
+                </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-4 pt-4">
-                    <button
-                      onClick={onClose}
-                      disabled={isApplying}
-                      className="flex-1 px-8 py-4 rounded-2xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-all disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleApply}
-                      disabled={isApplying}
-                      className="flex-[2] px-8 py-4 rounded-2xl bg-blue-600 text-white font-black hover:bg-blue-700 transition-all shadow-2xl shadow-blue-600/30 disabled:opacity-50 flex items-center justify-center gap-3"
-                    >
-                      {isApplying ? (
-                        <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          Sending Application...
-                        </>
-                      ) : (
-                        <>
-                          Send Application
-                          <Send className="w-5 h-5" />
-                        </>
-                      )}
-                    </button>
-                  </div>
+                {/* Actions */}
+                <div className="p-10 border-t border-slate-100 flex items-center gap-4 bg-slate-50/50 flex-shrink-0">
+                  <button
+                    onClick={onClose}
+                    disabled={isApplying}
+                    className="flex-1 px-8 py-4 rounded-2xl border border-slate-200 text-slate-600 bg-white font-bold hover:bg-slate-50 transition-all disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleApply}
+                    disabled={isApplying}
+                    className="flex-[2] px-8 py-4 rounded-2xl bg-blue-600 text-white font-black hover:bg-blue-700 transition-all shadow-2xl shadow-blue-600/30 disabled:opacity-50 flex items-center justify-center gap-3"
+                  >
+                    {isApplying ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Sending Application...
+                      </>
+                    ) : (
+                      <>
+                        Send Application
+                        <Send className="w-5 h-5" />
+                      </>
+                    )}
+                  </button>
                 </div>
               </>
             )}

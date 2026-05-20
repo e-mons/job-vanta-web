@@ -300,11 +300,12 @@ export const useResumeStore = create<ResumeState>()(
             const payloadSize = new Blob([JSON.stringify(data)]).size;
             console.log(`Syncing resume ${resumeId} (${(payloadSize / 1024).toFixed(2)} KB)`);
 
+            const now = new Date().toISOString();
             const { error } = await supabase
               .from('resumes')
               .update({ 
                 content: data,
-                updated_at: new Date().toISOString()
+                updated_at: now
               })
               .eq('id', resumeId);
 
@@ -315,9 +316,17 @@ export const useResumeStore = create<ResumeState>()(
             
             set({ lastSaved: new Date() });
             
-            // Refresh list in background
-            const { fetchUserResumes } = get();
-            fetchUserResumes();
+            // Update the local userResumes array inline instead of re-fetching.
+            // Re-fetching triggers the useEffect in the edit page which calls
+            // setResumeData() with stale DB data, overwriting in-memory changes
+            // (e.g. a photo that was just uploaded but not yet saved).
+            set((state) => ({
+              userResumes: state.userResumes.map(r =>
+                r.id === resumeId
+                  ? { ...r, content: data, updated_at: now }
+                  : r
+              ),
+            }));
           } catch (err: any) {
             console.error('CRITICAL: Save operation failed:', err);
             // If it's a fetch error, it's usually payload size (Vercel/Cloudflare limits) or network

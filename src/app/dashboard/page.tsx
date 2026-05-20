@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import CompanyLogo from "@/components/jobs/CompanyLogo";
+
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useJobStore } from '@/store/useJobStore';
@@ -216,13 +218,11 @@ export default function DashboardPage() {
                 {applications.length > 0 ? applications.map((app, i) => (
                   <div key={app.id || i} className="flex items-center justify-between p-4 rounded-3xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-slate-100 overflow-hidden relative border border-slate-200 flex items-center justify-center">
-                        {app.metadata?.companyLogo ? (
-                          <Image src={app.metadata.companyLogo} alt={app.company_name} fill className="object-cover" />
-                        ) : (
-                          <Building2 className="w-6 h-6 text-slate-400" />
-                        )}
-                      </div>
+                      <CompanyLogo 
+                        logoUrl={app.metadata?.companyLogo} 
+                        companyName={app.company_name} 
+                        size="sm" 
+                      />
                       <div>
                         <h4 className="font-bold text-slate-900">{app.job_title}</h4>
                         <p className="text-xs text-slate-500 font-medium">{app.company_name} • {formatDate(app.created_at)}</p>

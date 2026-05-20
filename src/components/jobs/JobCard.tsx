@@ -7,6 +7,8 @@ import { useSubscriptionStore } from "@/store/useSubscription";
 import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
 import UpgradeModal from "@/components/shared/UpgradeModal";
+import CompanyLogo from "./CompanyLogo";
+
 
 // Deterministic color from company name
 function companyColor(name: string): string {
@@ -46,6 +48,7 @@ export default function JobCard({ job, index, onApply }: JobCardProps) {
   const resumeSkills = useResumeStore((s) => s.data.skills);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
+  const [logoError, setLogoError] = useState(false);
   const premium = isPremium();
   const isSaved = savedJobIds.has(job.id);
   
@@ -80,15 +83,7 @@ export default function JobCard({ job, index, onApply }: JobCardProps) {
           {/* Top row: Avatar + Save */}
           <div className="flex items-start justify-between mb-8">
             <div className="relative">
-              {job.companyLogo ? (
-                <div className="w-16 h-16 rounded-[22px] bg-white border border-slate-100 p-2.5 flex items-center justify-center overflow-hidden shadow-sm group-hover:shadow-md transition-shadow">
-                  <img src={job.companyLogo} alt={job.company} className="w-full h-full object-contain" />
-                </div>
-              ) : (
-                <div className={`w-16 h-16 rounded-[22px] bg-gradient-to-br ${companyColor(job.company)} flex items-center justify-center text-white font-bold text-xl shadow-lg`}>
-                  {job.company.charAt(0)}
-                </div>
-              )}
+              <CompanyLogo logoUrl={job.companyLogo} companyName={job.company} size="md" />
               {isSaved && (
                 <div className="absolute -top-2 -right-2 w-6 h-6 bg-rose-500 rounded-full border-[3px] border-white flex items-center justify-center shadow-lg">
                   <Heart className="w-2.5 h-2.5 text-white fill-current" />
@@ -160,6 +155,21 @@ export default function JobCard({ job, index, onApply }: JobCardProps) {
               <Clock className="w-3 h-3" />
               {timeAgo(job.postedAt)}
             </div>
+          </div>
+
+          {/* Premium Save / Unsave Job Button */}
+          <div className="mt-6 relative z-20">
+            <button
+              onClick={handleToggleSave}
+              className={`group/btn w-full py-3 rounded-2xl font-black text-[11px] uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 border shadow-sm active:scale-[0.98] ${
+                isSaved
+                  ? "bg-rose-500 border-rose-500 text-white hover:bg-rose-600 hover:border-rose-600 hover:shadow-lg hover:shadow-rose-600/20"
+                  : "bg-slate-50/80 border-slate-200/80 text-slate-700 hover:bg-blue-600 hover:text-white hover:border-blue-600 hover:shadow-lg hover:shadow-blue-600/10"
+              }`}
+            >
+              <Heart className={`w-3.5 h-3.5 ${isSaved ? "fill-current text-white" : "text-slate-400 group-hover/btn:text-white transition-colors"}`} />
+              {isSaved ? "UnSave Job" : "Save Job"}
+            </button>
           </div>
 
           {/* Hover Arrow */}

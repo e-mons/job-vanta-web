@@ -1,6 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import CompanyLogo from "./CompanyLogo";
+
 import { 
   X, 
   MapPin, 
@@ -13,7 +16,10 @@ import {
   Calendar,
   Briefcase,
   Share2,
-  ExternalLink
+  ExternalLink,
+  Sparkles,
+  ArrowUpRight,
+  Bookmark
 } from "lucide-react";
 import { Job } from "@/store/useJobStore";
 import { useSubscriptionStore } from "@/store/useSubscription";
@@ -28,98 +34,123 @@ interface JobDetailsModalProps {
 export default function JobDetailsModal({ job, isOpen, onClose, onApply }: JobDetailsModalProps) {
   const { isPremium } = useSubscriptionStore();
   const premium = isPremium();
+  const [copied, setCopied] = useState(false);
 
   if (!job) return null;
+
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 lg:p-8">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 lg:p-8 overflow-hidden">
+          {/* Backdrop Blur */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+            className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl"
           />
           
+          {/* Main Premium Modal Container */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            initial={{ opacity: 0, scale: 0.95, y: 30 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="relative w-full max-w-4xl max-h-[90vh] bg-white rounded-[40px] shadow-2xl shadow-blue-900/20 overflow-hidden flex flex-col"
+            exit={{ opacity: 0, scale: 0.95, y: 30 }}
+            transition={{ type: "spring", damping: 25, stiffness: 350 }}
+            className="relative w-full max-w-4xl max-h-[90vh] bg-slate-900 border border-slate-800 rounded-[32px] shadow-[0_0_50px_rgba(37,99,235,0.15)] overflow-hidden flex flex-col text-slate-100"
           >
+            {/* Ambient Background Glows */}
+            <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-[100px] pointer-events-none" />
+            <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-[100px] pointer-events-none" />
+
             {/* Header / Banner Area */}
-            <div className="relative h-48 md:h-64 bg-slate-50 flex-shrink-0">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 to-indigo-600/5" />
+            <div className="relative h-28 md:h-32 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 flex-shrink-0 border-b border-slate-800 overflow-hidden flex items-end">
+              {/* Pattern Overlay */}
+              <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-30" />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent" />
               
+              {/* Close Button */}
               <button
                 onClick={onClose}
-                className="absolute top-6 right-6 p-3 rounded-2xl bg-white/80 backdrop-blur-md text-slate-400 hover:text-slate-900 transition-all border border-white/20 z-10"
+                className="absolute top-4 right-4 p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-400 hover:text-white transition-all border border-slate-700/50 z-20 hover:scale-105 active:scale-95 group"
               >
-                <X className="w-6 h-6" />
+                <X className="w-4.5 h-4.5 group-hover:rotate-90 transition-transform duration-200" />
               </button>
 
-              <div className="absolute -bottom-10 left-12 flex items-end gap-8">
-                {job.companyLogo ? (
-                  <div className="w-32 h-32 rounded-[32px] bg-white border-4 border-white shadow-2xl p-4 flex items-center justify-center">
-                    <img src={job.companyLogo} alt={job.company} className="w-full h-full object-contain" />
-                  </div>
-                ) : (
-                  <div className="w-32 h-32 rounded-[32px] bg-gradient-to-br from-blue-600 to-indigo-600 border-4 border-white shadow-2xl flex items-center justify-center text-white text-4xl font-black">
-                    {job.company.charAt(0)}
-                  </div>
-                )}
-                
-                <div className="mb-6">
-                  <h2 className="text-3xl font-black text-slate-900 mb-2">{job.title}</h2>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1.5 text-blue-600 font-bold">
-                      <Building2 className="w-4 h-4" />
-                      {job.company}
+              {/* Title & Info Wrapper */}
+              <div className="relative z-10 w-full px-6 md:px-8 pb-4 flex flex-row items-center gap-4">
+                <div className="relative flex-shrink-0 rounded-xl overflow-hidden border border-blue-500 bg-slate-900 shadow-[0_0_15px_rgba(59,130,246,0.25)] hover:scale-105 transition-transform duration-300">
+                  <CompanyLogo 
+                    logoUrl={job.companyLogo} 
+                    companyName={job.company} 
+                    size="md"
+                    className="p-1"
+                  />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    {/* Premium Badge */}
+                    <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold tracking-wide uppercase">
+                      <Sparkles className="w-2.5 h-2.5" />
+                      AI Verified Match
                     </div>
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />
-                    <div className="flex items-center gap-1.5 text-slate-500 font-bold">
-                      <MapPin className="w-4 h-4" />
-                      {job.location}
+                  </div>
+                  <h2 className="text-lg md:text-2xl font-extrabold tracking-tight text-white mb-1 leading-tight drop-shadow-sm truncate">
+                    {job.title}
+                  </h2>
+                  <div className="flex flex-wrap items-center gap-y-0.5 gap-x-3 text-xs font-semibold text-slate-400">
+                    <div className="flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors">
+                      <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>{job.company}</span>
+                    </div>
+                    <span className="w-1 h-1 rounded-full bg-slate-700 hidden sm:inline" />
+                    <div className="flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                      <span>{job.location}</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Content Area */}
-            <div className="flex-1 overflow-y-auto pt-16 px-12 pb-12">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-                {/* Main Details */}
-                <div className="lg:col-span-2 space-y-12">
-                  <section>
-                    <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                        <Briefcase className="w-4 h-4" />
-                      </div>
-                      Job Description
+            {/* Scrollable Content Area */}
+            <div className="flex-1 overflow-y-auto premium-scrollbar-dark px-6 md:px-8 py-6 relative">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* Main Details Column */}
+                <div className="lg:col-span-2 space-y-6">
+                  {/* Job Description Card */}
+                  <section className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-5 md:p-6 shadow-inner relative overflow-hidden group">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-blue-500 to-indigo-600" />
+                    <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                      <Briefcase className="w-4.5 h-4.5 text-blue-400" />
+                      About The Role
                     </h3>
-                    <div className="prose prose-slate max-w-none">
-                      <p className="text-slate-600 leading-relaxed text-lg font-medium whitespace-pre-wrap">
-                        {job.description}
-                      </p>
-                    </div>
+                    <p className="text-slate-300 leading-relaxed text-xs md:text-sm whitespace-pre-wrap font-medium">
+                      {job.description}
+                    </p>
                   </section>
 
+                  {/* Skills Section */}
                   {job.skills && job.skills.length > 0 && (
-                    <section>
-                      <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                          <Zap className="w-4 h-4" />
-                        </div>
-                        Required Skills
+                    <section className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-5 md:p-6 shadow-inner relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-indigo-500 to-violet-600" />
+                      <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                        <Zap className="w-4.5 h-4.5 text-indigo-400 animate-pulse" />
+                        Key Skills Required
                       </h3>
-                      <div className="flex flex-wrap gap-3">
+                      <div className="flex flex-wrap gap-2">
                         {job.skills.map((skill) => (
                           <span 
                             key={skill}
-                            className="px-5 py-2.5 rounded-2xl bg-slate-50 border border-slate-100 text-sm font-bold text-slate-600"
+                            className="px-3.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-[11px] font-bold text-slate-300 hover:border-blue-500/50 hover:text-white transition-all duration-200 cursor-default"
                           >
                             {skill}
                           </span>
@@ -129,104 +160,120 @@ export default function JobDetailsModal({ job, isOpen, onClose, onApply }: JobDe
                   )}
                 </div>
 
-                {/* Sidebar Info */}
-                <div className="space-y-8">
-                  <div className="p-8 rounded-[40px] bg-slate-50 border border-slate-100 space-y-8">
-                    <h4 className="text-sm font-black text-slate-400 uppercase tracking-widest">Job Overview</h4>
+                {/* Sidebar Info Column */}
+                <div className="space-y-4">
+                  {/* Glassmorphic Overview Panel */}
+                  <div className="p-5 rounded-2xl bg-gradient-to-b from-slate-950/70 to-slate-950/30 border border-slate-800 space-y-4">
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-800/60 pb-2">
+                      Overview Details
+                    </h4>
                     
-                    <div className="space-y-6">
-                      <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-blue-600 flex-shrink-0 shadow-sm">
-                          <DollarSign className="w-5 h-5" />
+                    <div className="space-y-3">
+                      {/* Salary */}
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 flex-shrink-0">
+                          <DollarSign className="w-3.5 h-3.5" />
                         </div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-400 uppercase mb-0.5">Salary Range</p>
-                          <p className="font-bold text-slate-900">{job.salary || "Competitive"}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-indigo-600 flex-shrink-0 shadow-sm">
-                          <Calendar className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-400 uppercase mb-0.5">Posted On</p>
-                          <p className="font-bold text-slate-900">{new Date(job.postedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                        <div className="min-w-0">
+                          <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Salary Range</p>
+                          <p className="text-xs font-semibold text-slate-200 truncate">{job.salary || "Competitive"}</p>
                         </div>
                       </div>
 
-                      <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-emerald-600 flex-shrink-0 shadow-sm">
-                          <Globe className="w-5 h-5" />
+                      {/* Posted On */}
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 flex-shrink-0">
+                          <Calendar className="w-3.5 h-3.5" />
                         </div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-400 uppercase mb-0.5">Remote Status</p>
-                          <p className="font-bold text-slate-900">{job.isRemote ? "Fully Remote" : "On-site / Hybrid"}</p>
+                        <div className="min-w-0">
+                          <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Posted Date</p>
+                          <p className="text-xs font-semibold text-slate-200 truncate">
+                            {new Date(job.postedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </p>
                         </div>
                       </div>
 
-                      <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-rose-600 flex-shrink-0 shadow-sm">
-                          <ShieldCheck className="w-5 h-5" />
+                      {/* Remote */}
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 flex-shrink-0">
+                          <Globe className="w-3.5 h-3.5" />
                         </div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-400 uppercase mb-0.5">Source</p>
-                          <p className="font-bold text-slate-900">{job.source}</p>
+                        <div className="min-w-0">
+                          <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Location Model</p>
+                          <p className="text-xs font-semibold text-slate-200 truncate">{job.isRemote ? "100% Remote" : "On-site / Hybrid"}</p>
+                        </div>
+                      </div>
+
+                      {/* Source */}
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 flex-shrink-0">
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Platform Source</p>
+                          <p className="text-xs font-semibold text-slate-200 truncate">{job.source}</p>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex gap-4">
-                    <button className="flex-1 p-4 rounded-2xl border border-slate-200 flex items-center justify-center gap-2 font-bold text-slate-600 hover:bg-slate-50 transition-all">
-                      <Share2 className="w-4 h-4" />
-                      Share
+                  {/* Share & Source Links */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button 
+                      onClick={handleShare}
+                      className="p-2.5 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center gap-1.5 text-[11px] font-bold transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                      {copied ? "Copied!" : "Share"}
                     </button>
                     <a 
                       href={job.applyLink} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="flex-1 p-4 rounded-2xl border border-slate-200 flex items-center justify-center gap-2 font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                      className="p-2.5 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center gap-1.5 text-[11px] font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
                     >
-                      <ExternalLink className="w-4 h-4" />
+                      <ExternalLink className="w-3.5 h-3.5" />
                       Source
                     </a>
                   </div>
                 </div>
+
               </div>
             </div>
 
-            {/* Bottom Action Bar */}
-            <div className="p-8 border-t border-slate-100 bg-white/80 backdrop-blur-md flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
-                  <ShieldCheck className="w-5 h-5" />
+            {/* Bottom Premium Action Bar */}
+            <div className="py-4 px-6 md:px-8 border-t border-slate-800 bg-slate-950/70 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-3 z-10">
+              <div className="flex items-center gap-2.5 self-start sm:self-auto">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shadow-lg flex-shrink-0">
+                  <ShieldCheck className="w-4 h-4" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Verified Application</p>
-                  <p className="text-xs font-bold text-slate-900">Your data is safe & encrypted</p>
+                  <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest leading-none mb-0.5">End-to-End Encrypted</p>
+                  <p className="text-[11px] font-bold text-slate-400 leading-none">Applications are safe and secure</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
                 <button
                   onClick={onClose}
-                  className="px-8 py-4 rounded-2xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-all"
+                  className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl border border-slate-800 hover:bg-slate-900 text-slate-300 hover:text-white font-bold text-xs transition-all hover:scale-105 active:scale-95 cursor-pointer"
                 >
                   Close
                 </button>
                 <button
                   onClick={onApply}
-                  className="px-12 py-4 rounded-2xl bg-blue-600 text-white font-black hover:bg-blue-700 transition-all shadow-2xl shadow-blue-600/30 active:scale-95 flex items-center gap-3"
+                  className="flex-1 sm:flex-none px-8 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-extrabold text-xs hover:from-blue-500 hover:to-indigo-500 transition-all shadow-[0_0_20px_rgba(37,99,235,0.35)] hover:scale-105 active:scale-95 flex items-center justify-center gap-1.5 group cursor-pointer"
                 >
-                  Apply Now
-                  <Briefcase className="w-5 h-5" />
+                  Apply Instantly
+                  <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                 </button>
               </div>
             </div>
+
           </motion.div>
         </div>
       )}
     </AnimatePresence>
   );
 }
+

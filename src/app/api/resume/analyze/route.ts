@@ -39,12 +39,22 @@ export async function POST(req: NextRequest) {
       ? `\n      Full Job Description:\n      ${jobDescription}\n\n      Use the job description above to perform a highly specific keyword and requirement analysis.`
       : '';
 
+    // Sanitize large base64 photo data to prevent exceeding model API payload limits
+    const originalPhoto = resumeData.personalInfo?.photo;
+    const sanitizedResumeData = { ...resumeData };
+    if (sanitizedResumeData.personalInfo) {
+      sanitizedResumeData.personalInfo = {
+        ...sanitizedResumeData.personalInfo,
+        photo: originalPhoto ? "[BASE64_PHOTO_DATA_REMOVED_FOR_ANALYSIS]" : ""
+      };
+    }
+
     const prompt = `
       You are an expert ATS (Applicant Tracking System) software used by Fortune 500 companies.
       Analyze the following structured resume data for the role of "${targetJobTitle || 'Software Professional'}'.${jobDescriptionSection}
       
       Resume Data:
-      ${JSON.stringify(resumeData, null, 2)}
+      ${JSON.stringify(sanitizedResumeData, null, 2)}
       
       Provide a comprehensive ATS analysis including:
       1. An overall ATS match score (0-100).
@@ -64,16 +74,18 @@ export async function POST(req: NextRequest) {
     const content = await callGeminiWithFallback(prompt);
 
     // Clean any accidental markdown wrapping
-    let cleanedContent = content;
-    if (content.includes("```")) {
-        cleanedContent = content.replace(/```json\n?|\n?```/g, '').trim();
+    let cleanedContent = content.trim();
+    const startIdx = cleanedContent.indexOf('{');
+    const endIdx = cleanedContent.lastIndexOf('}');
+    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+      cleanedContent = cleanedContent.substring(startIdx, endIdx + 1);
     }
 
     let parsedData;
     try {
         parsedData = JSON.parse(cleanedContent);
     } catch (e) {
-        console.error("Failed to parse AI response:", cleanedContent);
+        console.error("Failed to parse AI response:", content);
         throw new Error("Invalid response format from AI");
     }
 

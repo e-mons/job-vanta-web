@@ -48,6 +48,7 @@ interface JobState {
   selectedJob: Job | null;
   isLoading: boolean;
   error: string | null;
+  hasSearched: boolean;
 
   // Saved jobs state
   savedJobs: SavedJob[];
@@ -56,7 +57,7 @@ interface JobState {
 
   // Actions
   searchJobs: (query: string, location?: string) => Promise<void>;
-  searchByResume: (skills: string[]) => Promise<void>;
+  searchByResume: (skills: string[], filters?: { location?: string, radius?: string, isRemote?: boolean, jobType?: string, experienceLevel?: string }) => Promise<void>;
   saveJob: (job: Job) => Promise<void>;
   unsaveJob: (savedJobId: string) => Promise<void>;
   updateJobStatus: (savedJobId: string, status: JobStatus) => Promise<void>;
@@ -64,6 +65,7 @@ interface JobState {
   setSelectedJob: (job: Job | null) => void;
   setSearchQuery: (query: string) => void;
   setLocationFilter: (location: string) => void;
+  setHasSearched: (val: boolean) => void;
   reset: () => void;
 }
 
@@ -74,6 +76,7 @@ export const useJobStore = create<JobState>()((set, get) => ({
   selectedJob: null,
   isLoading: false,
   error: null,
+  hasSearched: false,
 
   savedJobs: [],
   savedJobIds: new Set<string>(),
@@ -82,6 +85,7 @@ export const useJobStore = create<JobState>()((set, get) => ({
   setSelectedJob: (job) => set({ selectedJob: job }),
   setSearchQuery: (query) => set({ searchQuery: query }),
   setLocationFilter: (location) => set({ locationFilter: location }),
+  setHasSearched: (val) => set({ hasSearched: val }),
 
   searchJobs: async (query, location) => {
     set({ isLoading: true, error: null, searchQuery: query, locationFilter: location || "" });
@@ -115,15 +119,15 @@ export const useJobStore = create<JobState>()((set, get) => ({
     }
   },
 
-  searchByResume: async (skills) => {
-    set({ isLoading: true, error: null });
+  searchByResume: async (skills, filters) => {
+    set({ isLoading: true, error: null, hasSearched: true });
     try {
       const res = await fetch(`/api/jobs/search`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ skills }),
+        body: JSON.stringify({ skills, filters }),
       });
 
       const data = await res.json();

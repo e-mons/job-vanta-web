@@ -20,6 +20,7 @@ interface SubscriptionState {
   fetchSubscription: () => Promise<void>;
   isPremium: () => boolean;
   createCheckoutSession: (priceId: string) => Promise<void>;
+  verifyAndSync: () => Promise<void>;
 }
 
 export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
@@ -56,7 +57,10 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
           isLoading: false 
         });
       } else {
-        set({ status: 'none', planId: null, currentPeriodEnd: null, isLoading: false });
+        // No subscription found in DB — try to verify with Dodo API
+        // This handles the case where the user just completed checkout
+        // but the webhook hasn't arrived (e.g. localhost development)
+        await get().verifyAndSync();
       }
     } catch (err: any) {
       set({ error: err.message, isLoading: false });
@@ -66,6 +70,43 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   isPremium: () => {
     const { status } = get();
     return status === 'active' || status === 'trialing';
+  },
+
+  /**
+   * Call the server-side verify endpoint to check Dodo for recent payments
+   * and sync the subscription to Supabase if one is found.
+   */
+  verifyAndSync: async () => {
+    try {
+      const res = await fetch('/api/dodopayments/verify', { method: 'POST' });
+      const result = await res.json();
+
+      if (result.status === 'synced' || result.status === 'already_active') {
+        // Re-fetch from Supabase to get the canonical data
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data } = await supabase
+          .from('subscriptions')
+          .select('status, plan_id, current_period_end')
+          .eq('user_id', user.id)
+          .single();
+
+        if (data) {
+          set({
+            status: data.status as SubscriptionStatus,
+            planId: data.plan_id,
+            currentPeriodEnd: data.current_period_end,
+            isLoading: false,
+          });
+        }
+      } else {
+        set({ status: 'none', planId: null, currentPeriodEnd: null, isLoading: false });
+      }
+    } catch {
+      set({ status: 'none', planId: null, currentPeriodEnd: null, isLoading: false });
+    }
   },
 
   createCheckoutSession: async (productId: string) => {

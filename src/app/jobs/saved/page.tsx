@@ -27,6 +27,7 @@ import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import Image from "next/image";
+import CompanyLogo from "@/components/jobs/CompanyLogo";
 
 const STATUS_CONFIG: Record<
   JobStatus,
@@ -71,22 +72,6 @@ const STATUS_CONFIG: Record<
 
 const STATUS_ORDER: JobStatus[] = ["saved", "applied", "interviewing", "offered", "rejected"];
 
-function companyColor(name: string): string {
-  const colors = [
-    "from-blue-600 to-indigo-600",
-    "from-indigo-600 to-violet-600",
-    "from-emerald-600 to-teal-600",
-    "from-orange-600 to-rose-600",
-    "from-sky-600 to-blue-700",
-    "from-amber-600 to-orange-600",
-    "from-violet-600 to-purple-600",
-    "from-cyan-600 to-blue-700",
-  ];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return colors[Math.abs(hash) % colors.length];
-}
-
 function SavedJobCard({
   job,
   index,
@@ -120,73 +105,77 @@ function SavedJobCard({
     router.push(`/jobs/${job.id}`);
   };
 
+  const isRemote = job.location ? job.location.toLowerCase().includes('remote') : false;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: index * 0.05 }}
       onClick={handleViewDetails}
-      className={`group p-6 rounded-[32px] bg-white border border-slate-200/60 hover:border-blue-200 hover:shadow-2xl hover:shadow-blue-900/5 transition-all duration-300 relative overflow-hidden cursor-pointer`}
+      className="group p-5 rounded-[24px] bg-white border border-slate-200/70 hover:border-blue-400 hover:shadow-[0_15px_30px_-5px_rgba(59,130,246,0.08)] transition-all duration-300 relative overflow-hidden flex flex-col justify-between cursor-pointer min-h-[220px]"
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
       
-      <div className="relative z-10">
-        <div className="flex items-start gap-4">
-          <div
-            className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${companyColor(job.company_name)} flex items-center justify-center text-white font-black text-xl shadow-lg shadow-slate-200 shrink-0 transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}
-          >
-            {job.company_name.charAt(0)}
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <h3 className="text-base font-black text-slate-900 truncate leading-tight group-hover:text-blue-600 transition-colors">
-                {job.job_title}
-              </h3>
-              {job.job_url && (
-                <a
-                  href={job.job_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </a>
-              )}
+      <div className="relative z-10 flex flex-col h-full justify-between">
+        {/* Top Header Row: Logo & Badges */}
+        <div>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="relative transform group-hover:scale-105 transition-transform duration-300">
+              <CompanyLogo 
+                logoUrl={job.metadata?.companyLogo || null} 
+                companyName={job.company_name} 
+                size="sm"
+                className="p-0.5 rounded-xl border border-slate-100/80 shadow-sm"
+              />
             </div>
             
-            <div className="flex items-center gap-2 mt-2 text-xs font-bold text-slate-500">
-              <Building2 className="w-4 h-4 text-slate-400" />
-              <span className="truncate">{job.company_name}</span>
+            {/* Tiny Location Pill */}
+            <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
+              isRemote ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-slate-50 text-slate-400 border border-slate-100"
+            }`}>
+              {isRemote ? "Remote" : "Hybrid"}
+            </span>
+          </div>
+
+          {/* Job Title: Full width, clamped to 2 lines to align nicely */}
+          <div className="space-y-1">
+            <h3 className="text-sm font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors leading-snug line-clamp-2 min-h-[2.5rem]">
+              {job.job_title}
+            </h3>
+            
+            {/* Company & Location Details */}
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span className="truncate">{job.company_name}</span>
+              </div>
+              
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400">
+                <MapPin className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+                <span className="truncate">{job.location || 'Remote'}</span>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 mt-4 text-[11px] font-bold text-slate-400">
-          <div className="flex items-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5" />
-            <span className="truncate">{job.location || 'Remote'}</span>
-          </div>
-          <span className="text-slate-200">•</span>
-          <span>{new Date(job.updated_at).toLocaleDateString()}</span>
-        </div>
-
-        <div className="flex items-center justify-between mt-6 pt-5 border-t border-slate-50">
+        {/* Bottom Actions Area */}
+        <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between">
           <span
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider ${config.bgColor} ${config.color} border ${config.borderColor}`}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider ${config.bgColor} ${config.color} border ${config.borderColor}`}
           >
             {config.icon}
             {config.label}
           </span>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {nextStatus && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   updateJobStatus(job.id, nextStatus);
                 }}
-                className="flex items-center justify-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 text-slate-500 text-[10px] font-black hover:bg-blue-600 hover:text-white transition-all uppercase tracking-wider"
+                className="flex items-center justify-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-blue-600 hover:text-white border border-slate-100 hover:border-blue-600 text-[9px] font-black text-slate-500 transition-all uppercase tracking-wider"
               >
                 Next <ChevronRight className="w-3 h-3" />
               </button>
@@ -196,10 +185,10 @@ function SavedJobCard({
                 e.stopPropagation();
                 unsaveJob(job.id);
               }}
-              className="p-2 rounded-xl text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-all"
+              className="p-1.5 rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-100 transition-all"
               title="Unsave Job"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>

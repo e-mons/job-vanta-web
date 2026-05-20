@@ -58,13 +58,14 @@ function CoverLetterBuilderContent() {
     if (!user) return;
 
     const { data, error } = await supabase
-      .from('user_resumes')
+      .from('resumes')
       .select('id, title, content')
       .eq('user_id', user.id);
 
     if (data) {
       setResumes(data);
-      if (data.length > 0) setSelectedResumeId(data[0].id);
+      // Only default selected if not already set by loading an existing cover letter
+      if (data.length > 0 && !selectedResumeId) setSelectedResumeId(data[0].id);
     }
   };
 
@@ -81,6 +82,7 @@ function CoverLetterBuilderContent() {
       setTargetJobTitle(data.target_job_title || "");
       setCompanyName(data.company_name || "");
       setContent(data.content.text || "");
+      if (data.resume_id) setSelectedResumeId(data.resume_id);
       if (data.content.jobDescription) setJobDescription(data.content.jobDescription);
       if (data.content.tone) setTone(data.content.tone);
     }
@@ -119,7 +121,9 @@ function CoverLetterBuilderContent() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Generation failed");
 
-      setContent(data.data.content);
+      const generatedContent = data.content || data.data?.content;
+      if (!generatedContent) throw new Error("No content returned from AI. Please try again.");
+      setContent(generatedContent);
     } catch (error: any) {
       console.error(error);
       toast.error(error.message);
@@ -135,25 +139,57 @@ function CoverLetterBuilderContent() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const clData = {
+      const clData: any = {
         user_id: user.id,
         title,
         target_job_title: targetJobTitle,
         company_name: companyName,
-        content: { text: content, jobDescription, tone }
+        content: { text: content, jobDescription, tone },
+        resume_id: selectedResumeId || null
       };
 
       if (id) {
-        await supabase.from('cover_letters').update(clData).eq('id', id);
+        const { error } = await supabase.from('cover_letters').update(clData).eq('id', id);
+        if (error) {
+          if (error.code === '23505') {
+            throw new Error("This resume already has an associated cover letter. You can edit it directly on that resume's builder page.");
+          }
+          throw error;
+        }
+        toast.success("Cover letter updated successfully!");
       } else {
-        const { data } = await supabase.from('cover_letters').insert([clData]).select().single();
+        // If they select a resume, let's check if it already has a cover letter to avoid duplicate inserts
+        if (selectedResumeId) {
+          const { data: existingCL } = await supabase
+            .from('cover_letters')
+            .select('id')
+            .eq('resume_id', selectedResumeId)
+            .maybeSingle();
+
+          if (existingCL) {
+            const { error } = await supabase
+              .from('cover_letters')
+              .update(clData)
+              .eq('id', existingCL.id);
+
+            if (error) throw error;
+            toast.success("Cover letter saved (updated existing cover letter for this resume)!");
+            router.replace(`/cover-letter/builder?id=${existingCL.id}`);
+            setIsSaving(false);
+            return;
+          }
+        }
+
+        const { data, error } = await supabase.from('cover_letters').insert([clData]).select().single();
+        if (error) throw error;
         if (data) {
+          toast.success("Cover letter saved successfully!");
           router.replace(`/cover-letter/builder?id=${data.id}`);
         }
       }
     } catch (error: any) {
       console.error(error);
-      toast.error("Failed to save cover letter.");
+      toast.error(error.message || "Failed to save cover letter.");
     } finally {
       setIsSaving(false);
     }
@@ -299,12 +335,17 @@ function CoverLetterBuilderContent() {
         <main className="flex-1 bg-slate-100 overflow-y-auto p-8 flex justify-center print:bg-white print:p-0">
           <div className="w-full max-w-[800px] min-h-[1056px] bg-white shadow-2xl rounded-sm print:shadow-none print:w-full print:max-w-none">
             <div className="p-12 md:p-16 h-full flex flex-col">
+              {/* Editable textarea - visible on screen, hidden in print */}
               <textarea
                 value={content}
                 onChange={e => setContent(e.target.value)}
                 placeholder="Your cover letter content will appear here..."
-                className="w-full h-full flex-1 resize-none border-none outline-none text-slate-800 font-serif leading-relaxed text-base placeholder:text-slate-300 print:text-black"
+                className="w-full h-full flex-1 resize-none border-none outline-none text-slate-800 font-serif leading-relaxed text-base placeholder:text-slate-300 print:hidden"
               />
+              {/* Rendered content - hidden on screen, visible in print */}
+              <div className="hidden print:block text-black font-serif leading-relaxed text-base whitespace-pre-wrap">
+                {content}
+              </div>
             </div>
           </div>
         </main>

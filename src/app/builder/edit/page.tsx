@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useResumeStore, OnboardingStatus } from '@/store/useResumeStore';
 import { useSubscriptionStore } from '@/store/useSubscription';
 import dynamic from 'next/dynamic';
-import { Plus, Trash2, Wand2, GripVertical, ChevronLeft, Save, Sparkles, ShieldCheck, Crown, FileText, Download, ZoomIn, ZoomOut, CheckCircle2, AlertTriangle, X, ArrowRight, ArrowLeft, Loader2, Mail, Target, Layout, Palette } from 'lucide-react';
+import { Plus, Trash2, Wand2, GripVertical, ChevronLeft, ChevronRight, Save, Sparkles, ShieldCheck, Crown, FileText, Download, ZoomIn, ZoomOut, CheckCircle2, AlertTriangle, X, ArrowRight, ArrowLeft, Loader2, Mail, Target, Layout, Palette } from 'lucide-react';
 import Link from 'next/link';
 import { v4 as uuidv4 } from 'uuid';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -18,8 +18,9 @@ const resumeSchema = z.object({
   personalInfo: z.object({
     fullName: z.string().min(2, "Full Name is required (at least 2 characters)."),
     email: z.string().email("A valid email address is required."),
-    phone: z.string().optional(),
-    location: z.string().optional(),
+    phone: z.string().min(5, "A valid phone number is required."),
+    location: z.string().min(2, "Location (City, State/Country) is required."),
+    summary: z.string().min(20, "Professional Summary is required (at least 20 characters)."),
     website: z.string().optional(),
     photo: z.string().optional(),
   }),
@@ -36,7 +37,7 @@ const resumeSchema = z.object({
     degree: z.string(),
     year: z.string(),
   })).optional(),
-  skills: z.array(z.string()).optional(),
+  skills: z.array(z.string()).min(3, "Please add at least 3 skills to proceed."),
   projects: z.array(z.object({
     id: z.string(),
     name: z.string(),
@@ -49,6 +50,59 @@ const resumeSchema = z.object({
 import HTMLPreview from '@/components/builder/Preview/HTMLPreview';
 const PDFPreview = dynamic(() => import('@/components/builder/Preview/PDFPreview'), { ssr: false });
 import TemplateGallery from '@/components/builder/Templates/TemplateGallery';
+
+const deriveJobTitleFromResume = (resume: any): string => {
+  if (!resume) return "";
+  
+  // 1. Try to find from first experience role
+  if (resume.experience && resume.experience.length > 0) {
+    const firstRole = resume.experience[0].role;
+    if (firstRole && firstRole.trim()) {
+      return firstRole.trim();
+    }
+  }
+  
+  // 2. Try to find from any other experience role
+  if (resume.experience) {
+    for (const exp of resume.experience) {
+      if (exp.role && exp.role.trim()) {
+        return exp.role.trim();
+      }
+    }
+  }
+  
+  // 3. Fallback based on skills
+  if (resume.skills && resume.skills.length > 0) {
+    const skillsText = (resume.skills || []).join(" ").toLowerCase();
+    if (skillsText.includes("react") || skillsText.includes("typescript") || skillsText.includes("javascript") || skillsText.includes("frontend") || skillsText.includes("backend") || skillsText.includes("node") || skillsText.includes("software") || skillsText.includes("developer") || skillsText.includes("engineer")) {
+      return "Software Engineer";
+    }
+    if (skillsText.includes("design") || skillsText.includes("ux") || skillsText.includes("ui") || skillsText.includes("figma") || skillsText.includes("photoshop")) {
+      return "UI/UX Designer";
+    }
+    if (skillsText.includes("marketing") || skillsText.includes("seo") || skillsText.includes("social media") || skillsText.includes("sales")) {
+      return "Marketing Manager";
+    }
+    if (skillsText.includes("finance") || skillsText.includes("accounting") || skillsText.includes("excel") || skillsText.includes("analyst")) {
+      return "Financial Analyst";
+    }
+  }
+
+  // 4. Fallback based on education
+  if (resume.education && resume.education.length > 0) {
+    const firstEdu = resume.education[0];
+    const degree = (firstEdu.degree || "").toLowerCase();
+    if (degree.includes("computer science") || degree.includes("information technology") || degree.includes("engineering")) {
+      return "Software Engineer";
+    }
+    if (degree.includes("business") || degree.includes("marketing") || degree.includes("economics")) {
+      return "Business Analyst";
+    }
+  }
+  
+  // 5. Default fallback
+  return "Professional";
+};
 
 function BuilderEditContent() {
   const searchParams = useSearchParams();
@@ -68,7 +122,9 @@ function BuilderEditContent() {
   const [atsResult, setAtsResult] = useState<{ score: number, feedback: string, keywordsMissing: string[], improvements: string[] } | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isMatching, setIsMatching] = useState(false);
-  const [hasPrefilledAts, setHasPrefilledAts] = useState(false);
+  const [matchedJob, setMatchedJob] = useState<{ title: string; company: string } | null>(null);
+  const [isOptimizedForJob, setIsOptimizedForJob] = useState(false);
+  const [showArrivalToast, setShowArrivalToast] = useState(false);
 
   // Onboarding state
   const currentResume = userResumes.find(r => r.id === resumeId);
@@ -80,6 +136,12 @@ function BuilderEditContent() {
   const [clCompany, setClCompany] = useState('');
   const [clContent, setClContent] = useState('');
   const [isGeneratingCL, setIsGeneratingCL] = useState(false);
+  const [isSavingCL, setIsSavingCL] = useState(false);
+
+  // AI Resume Generator State
+  const [showAIPrompt, setShowAIPrompt] = useState(searchParams.get('source') === 'scratch');
+  const [aiPrompt, setAiPrompt] = useState("I am a marketing manager with 6 years of experience. I previously worked at Tech Innovators and Global Solutions. I am skilled in SEO, content strategy, and team leadership. Generate a professional resume for me.");
+  const [isGeneratingResume, setIsGeneratingResume] = useState(false);
 
   // Active Tab for completed mode
   const initialTab = searchParams.get('tab') as 'edit' | 'optimize' | 'cover_letter';
@@ -89,6 +151,67 @@ function BuilderEditContent() {
   const [isPreviewMode, setIsPreviewMode] = useState<'live' | 'pdf'>('live');
   const [zoomScale, setZoomScale] = useState(0.6);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+
+  const fetchCoverLetter = async (rId: string) => {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('cover_letters')
+        .select('*')
+        .eq('resume_id', rId)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error fetching cover letter:", error);
+        return;
+      }
+
+      if (data) {
+        setClJobTitle(data.target_job_title || '');
+        setClCompany(data.company_name || '');
+        if (data.content && typeof data.content === 'object') {
+          setClContent((data.content as any).text || '');
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load cover letter:", err);
+    }
+  };
+
+  const handleSaveCoverLetter = async (customContent?: string) => {
+    if (!resumeId) return;
+    const contentToSave = customContent !== undefined ? customContent : clContent;
+    if (!contentToSave) return;
+
+    setIsSavingCL(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const clData = {
+        resume_id: resumeId,
+        user_id: user.id,
+        title: `Cover Letter - ${clJobTitle || 'Untitled'}`,
+        target_job_title: clJobTitle,
+        company_name: clCompany,
+        content: { text: contentToSave },
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await supabase
+        .from('cover_letters')
+        .upsert(clData, { onConflict: 'resume_id' });
+
+      if (error) throw error;
+      toast.success("Cover letter saved successfully!");
+    } catch (err: any) {
+      console.error("Failed to save cover letter:", err);
+      toast.error("Failed to save cover letter.");
+    } finally {
+      setIsSavingCL(false);
+    }
+  };
 
   const handleGenerateCoverLetter = async () => {
     if (!clJobTitle.trim()) return;
@@ -100,8 +223,13 @@ function BuilderEditContent() {
         body: JSON.stringify({ resumeData: data, jobTitle: clJobTitle, company: clCompany }),
       });
       const result = await res.json();
-      if (result.content) setClContent(result.content);
-      else throw new Error(result.error || 'Generation failed');
+      if (result.content) {
+        setClContent(result.content);
+        // Automatically save the newly generated cover letter to the database
+        await handleSaveCoverLetter(result.content);
+      } else {
+        throw new Error(result.error || 'Generation failed');
+      }
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || 'Failed to generate cover letter');
@@ -110,14 +238,80 @@ function BuilderEditContent() {
     }
   };
 
+  const handleGenerateResume = async () => {
+    if (!aiPrompt.trim()) {
+      toast.error("Please explain the resume you want to build.");
+      return;
+    }
+    setIsGeneratingResume(true);
+    try {
+      const res = await fetch("/api/resume/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: aiPrompt }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Generation failed");
+      
+      setResumeData(result.data);
+      setShowAIPrompt(false); // Hide the prompt box
+      toast.success("Resume generated successfully!");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to generate resume");
+    } finally {
+      setIsGeneratingResume(false);
+    }
+  };
+
   const advanceStep = async (next: OnboardingStatus) => {
     if (resumeId) {
       await updateOnboardingStatus(resumeId, next);
       if (next === 'completed') {
-        // Scroll to top
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        // Onboarding finished — navigate to jobs page with resume context
+        router.push(`/jobs?resumeId=${resumeId}`);
       }
     }
+  };
+
+  const handleNextStep = () => {
+    const result = resumeSchema.safeParse(data);
+    if (!result.success) {
+      const errors = result.error.issues.map(e => e.message);
+      setValidationErrors(errors);
+      setShowValidationToast(true);
+      setTimeout(() => setShowValidationToast(false), 6000);
+      toast.error("Please fill in all required fields before proceeding.");
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    
+    setValidationErrors([]);
+    setShowValidationToast(false);
+    
+    if (isOnboarding) {
+      advanceStep('step_2_optimize');
+    } else {
+      setActiveTab('optimize');
+    }
+  };
+
+  const handleTabSwitch = (targetTab: 'edit' | 'optimize' | 'cover_letter') => {
+    if (activeTab === 'edit' && targetTab !== 'edit') {
+      const result = resumeSchema.safeParse(data);
+      if (!result.success) {
+        const errors = result.error.issues.map(e => e.message);
+        setValidationErrors(errors);
+        setShowValidationToast(true);
+        setTimeout(() => setShowValidationToast(false), 6000);
+        toast.error("Please fill in all required fields before navigating.");
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      setValidationErrors([]);
+      setShowValidationToast(false);
+    }
+    setActiveTab(targetTab);
   };
 
   const handleGetMatchingJobs = () => {
@@ -197,54 +391,138 @@ function BuilderEditContent() {
       if (!response.ok) throw new Error(result.error || 'Optimization failed');
       setResumeData(result.optimizedData);
       setIsATSModalOpen(false);
+      setIsOptimizedForJob(true);
+      
+      const matchJobId = searchParams.get('matchJobId');
+      if (matchJobId) {
+        sessionStorage.setItem(`optimized_${matchJobId}`, 'true');
+      }
+      
+      return true;
     } catch (err: any) {
       console.error('Optimization Error:', err);
       toast.error(err.message || 'AI optimization failed. Please try again.');
+      return false;
     } finally {
       setIsAnalyzing(false);
     }
   };
 
+  // Track whether we've already loaded the resume data for this session
+  const hasLoadedData = useState(false);
+
   useEffect(() => {
     fetchSubscription();
     if (resumeId) {
       setCurrentResumeId(resumeId);
-      const resume = userResumes.find(r => r.id === resumeId);
-      if (resume) {
-        setResumeData(resume.content);
-      } else {
-        fetchUserResumes().then(() => {
-          const r = useResumeStore.getState().userResumes.find(res => res.id === resumeId);
-          if (r) setResumeData(r.content);
-        });
+      fetchCoverLetter(resumeId);
+
+      // Only load data from the store/DB on first mount, not on every userResumes change
+      if (!hasLoadedData[0]) {
+        const resume = userResumes.find(r => r.id === resumeId);
+        if (resume) {
+          setResumeData(resume.content);
+          hasLoadedData[1](true);
+        } else {
+          fetchUserResumes().then(() => {
+            const r = useResumeStore.getState().userResumes.find(res => res.id === resumeId);
+            if (r) setResumeData(r.content);
+            hasLoadedData[1](true);
+          });
+        }
       }
     }
 
     // Handle Job Matching from URL
     const matchJobId = searchParams.get('matchJobId');
     if (matchJobId) {
-      const job = useJobStore.getState().savedJobs.find(j => j.id === matchJobId);
-      if (job) {
-        setAtsTargetJob(job.job_title || "");
-        setAtsJobDescription(job.metadata?.description || "");
-        setIsATSModalOpen(true);
-        setIsMatching(true);
-      }
-    }
-  }, [resumeId, setCurrentResumeId, fetchSubscription, userResumes, fetchUserResumes, setResumeData, searchParams]);
+      const supabase = createClient();
+      // Use .maybeSingle() to gracefully handle unsaved search-result jobs (returns null instead of PGRST116 error)
+      supabase.from('saved_jobs').select('*').eq('id', matchJobId).maybeSingle().then(({ data: job, error }) => {
+        if (error) {
+          console.warn("Unexpected error fetching saved_jobs:", error);
+        }
 
-  // Auto-prefill target job from resume experience if not set
+        // Helper to apply cached ATS result and optimization state
+        const applyCachedState = () => {
+          const cachedResult = sessionStorage.getItem(`ats_result_${matchJobId}`);
+          if (cachedResult) {
+            setAtsResult(JSON.parse(cachedResult));
+          } else {
+            setIsATSModalOpen(true);
+          }
+          const optimizedSession = sessionStorage.getItem(`optimized_${matchJobId}`);
+          if (optimizedSession === 'true') {
+            setIsOptimizedForJob(true);
+          }
+          setShowArrivalToast(true);
+        };
+
+        // Helper to hydrate matched job state from a resolved source
+        const hydrateFromSource = (title: string, company: string, description: string) => {
+          setMatchedJob({ title, company });
+          setAtsTargetJob(title || "");
+          setAtsJobDescription(description || "");
+          setIsMatching(true);
+          setClJobTitle(title || "");
+          setClCompany(company || "");
+          applyCachedState();
+        };
+
+        // ── Direct database record found (saved job) ──
+        if (job) {
+          hydrateFromSource(job.job_title, job.company_name, job.metadata?.description || "");
+          return;
+        }
+
+        // ── Fallback 1: Zustand active selectedJob (in-memory, same SPA session) ──
+        const activeSelectedJob = useJobStore.getState().selectedJob;
+        if (activeSelectedJob && (activeSelectedJob.id === matchJobId || activeSelectedJob.title)) {
+          console.log("Fallback: Loaded job from active selectedJob store");
+          hydrateFromSource(activeSelectedJob.title, activeSelectedJob.company, activeSelectedJob.description || "");
+          return;
+        }
+
+        // ── Fallback 2: sessionStorage cached metadata (survives hard refresh) ──
+        const cachedMetadataStr = sessionStorage.getItem(`job_metadata_${matchJobId}`);
+        if (cachedMetadataStr) {
+          try {
+            const cachedJob = JSON.parse(cachedMetadataStr);
+            if (cachedJob && (cachedJob.title || cachedJob.company)) {
+              console.log("Fallback: Loaded job from session cache");
+              hydrateFromSource(cachedJob.title, cachedJob.company, cachedJob.description || "");
+              return;
+            }
+          } catch (parseErr) {
+            console.warn("Failed to parse cached job metadata:", parseErr);
+          }
+        }
+
+        // ── Fallback 3: Re-fetch saved jobs list from database ──
+        useJobStore.getState().fetchSavedJobs().then(() => {
+          const fallbackJob = useJobStore.getState().savedJobs.find(j => j.id === matchJobId);
+          if (fallbackJob) {
+            console.log("Fallback: Loaded job from re-fetched savedJobs list");
+            hydrateFromSource(fallbackJob.job_title, fallbackJob.company_name, fallbackJob.metadata?.description || "");
+          }
+        });
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeId]);
+
+  // Auto-prefill target job from resume experience to ensure it is never empty
   useEffect(() => {
     const matchJobId = searchParams.get('matchJobId');
-    if (!hasPrefilledAts && !matchJobId && data?.experience && data.experience.length > 0) {
-      const firstRole = data.experience[0].role;
-      if (firstRole) {
-        setAtsTargetJob(prev => prev || firstRole);
-        setClJobTitle(prev => prev || firstRole);
-        setHasPrefilledAts(true);
-      }
+    const derivedTitle = deriveJobTitleFromResume(data);
+    
+    if (!atsTargetJob.trim() && !matchJobId) {
+      setAtsTargetJob(derivedTitle);
     }
-  }, [data?.experience, hasPrefilledAts, searchParams]);
+    if (!clJobTitle.trim() && !matchJobId) {
+      setClJobTitle(derivedTitle);
+    }
+  }, [data, atsTargetJob, clJobTitle, searchParams]);
 
   const premium = isPremium();
 
@@ -371,10 +649,10 @@ function BuilderEditContent() {
           {!isOnboarding ? (
             <>
               <button 
-                onClick={() => setIsATSModalOpen(true)}
-                className="px-6 py-3 rounded-2xl bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 hover:shadow-xl hover:shadow-indigo-500/20 transition-all flex items-center gap-2"
+                onClick={handleGetMatchingJobs}
+                className="px-6 py-3 rounded-2xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 hover:shadow-xl hover:shadow-emerald-500/20 transition-all flex items-center gap-2"
               >
-                <Sparkles className="w-4 h-4" /> ATS Scan
+                <Target className="w-4 h-4" /> Find Matching Jobs
               </button>
               <button 
                 onClick={handleExportPDF}
@@ -385,27 +663,6 @@ function BuilderEditContent() {
             </>
           ) : (
             <div className="flex items-center gap-2">
-              {onboardingStatus !== 'step_1_edit' && (
-                <button
-                  onClick={() => {
-                    if (onboardingStatus === 'step_2_optimize') advanceStep('step_1_edit');
-                    else if (onboardingStatus === 'step_3_cover_letter') advanceStep('step_2_optimize');
-                  }}
-                  className="px-6 py-3 rounded-2xl bg-white border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all flex items-center gap-2 active:scale-95"
-                >
-                  <ArrowLeft className="w-4 h-4" /> Previous
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  if (onboardingStatus === 'step_1_edit') advanceStep('step_2_optimize');
-                  else if (onboardingStatus === 'step_2_optimize') advanceStep('step_3_cover_letter');
-                  else advanceStep('completed');
-                }}
-                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-sm hover:shadow-xl hover:shadow-blue-500/25 transition-all flex items-center gap-2 active:scale-95"
-              >
-                {onboardingStatus === 'step_3_cover_letter' ? 'Complete & Find Jobs' : 'Next Step'} <ArrowRight className="w-4 h-4" />
-              </button>
             </div>
           )}
         </div>
@@ -423,7 +680,7 @@ function BuilderEditContent() {
               ] as const).map((tab) => (
                 <button
                   key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
+                  onClick={() => handleTabSwitch(tab.key)}
                   className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
                     activeTab === tab.key 
                       ? 'bg-white text-blue-600 shadow-md shadow-slate-200 ring-1 ring-slate-200' 
@@ -454,17 +711,16 @@ function BuilderEditContent() {
                   const isActive = step.key === onboardingStatus;
                   const isDone = i < currentIndex;
                   return (
-                    <button 
+                    <div 
                       key={step.key} 
-                      onClick={() => advanceStep(step.key as OnboardingStatus)}
-                      className="flex-1 text-left group transition-all active:scale-[0.98]"
+                      className="flex-1 text-left transition-all"
                     >
-                      <div className={`h-1.5 rounded-full transition-all duration-500 ${isDone ? 'bg-emerald-500' : isActive ? 'bg-blue-600' : 'bg-slate-200 group-hover:bg-slate-300'}`} />
+                      <div className={`h-1.5 rounded-full transition-all duration-500 ${isDone ? 'bg-emerald-500' : isActive ? 'bg-blue-600' : 'bg-slate-200'}`} />
                       <div className="flex items-center gap-1.5 mt-2">
-                        <span className="text-sm transition-transform group-hover:scale-110 duration-300">{step.icon}</span>
-                        <span className={`text-[10px] font-bold uppercase tracking-wider ${isActive ? 'text-blue-600' : isDone ? 'text-emerald-600' : 'text-slate-400 group-hover:text-slate-600'}`}>{step.label}</span>
+                        <span className="text-sm">{step.icon}</span>
+                        <span className={`text-[10px] font-bold uppercase tracking-wider ${isActive ? 'text-blue-600' : isDone ? 'text-emerald-600' : 'text-slate-400'}`}>{step.label}</span>
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -473,14 +729,207 @@ function BuilderEditContent() {
         </div>
       </div>
 
+      {/* Sticky Matching Banner */}
+      {isMatching && matchedJob && (
+        <div className={`border-b px-8 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 z-20 shadow-sm backdrop-blur-md sticky top-0 transition-all duration-500 ${
+          isOptimizedForJob || atsResult 
+            ? 'bg-emerald-50/90 border-emerald-200/40 text-slate-900' 
+            : 'bg-blue-50/90 border-blue-200/40 text-slate-900'
+        }`}>
+          <div className="flex items-center gap-4">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shrink-0 relative ${
+              isOptimizedForJob || atsResult
+                ? 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/20'
+                : 'bg-gradient-to-br from-blue-600 to-indigo-600 shadow-blue-500/20'
+            }`}>
+              {isOptimizedForJob || atsResult ? (
+                <CheckCircle2 className="w-5.5 h-5.5 text-white" />
+              ) : (
+                <Sparkles className="w-5.5 h-5.5 text-white animate-pulse" />
+              )}
+              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  isOptimizedForJob || atsResult ? 'bg-emerald-400' : 'bg-blue-400'
+                }`}></span>
+                <span className={`relative inline-flex rounded-full h-3 w-3 ${
+                  isOptimizedForJob || atsResult ? 'bg-emerald-500' : 'bg-blue-500'
+                }`}></span>
+              </span>
+            </div>
+            <div>
+              <div className="flex items-center gap-2.5">
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                  isOptimizedForJob || atsResult
+                    ? 'bg-emerald-100/80 text-emerald-800 border border-emerald-200/60'
+                    : 'bg-blue-100/80 text-blue-800 border border-blue-200/60'
+                }`}>
+                  {isOptimizedForJob || atsResult ? '✅ Resume Tailored' : '🎯 AI Match Active'}
+                </span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  {isOptimizedForJob || atsResult ? 'Optimized version active' : 'Currently Tailoring Resume'}
+                </span>
+              </div>
+              <p className="text-sm font-black text-slate-900 mt-1">
+                {matchedJob.title} <span className="text-slate-400 font-medium">at</span> <span className="text-blue-600 font-black">{matchedJob.company}</span>
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+            {atsResult ? (
+              <div className="flex items-center gap-3 px-4 py-2 bg-white/80 border border-slate-200/60 rounded-2xl">
+                <div className="relative w-8 h-8 flex items-center justify-center shrink-0">
+                  <svg className="w-full h-full transform -rotate-90">
+                    <circle cx="16" cy="16" r="13" stroke="currentColor" strokeWidth="3" fill="transparent" className="text-slate-100" />
+                    <circle cx="16" cy="16" r="13" stroke="currentColor" strokeWidth="3" fill="transparent" 
+                      strokeDasharray={81.6} 
+                      strokeDashoffset={81.6 - (81.6 * atsResult.score) / 100}
+                      className={`${atsResult.score >= 80 ? 'text-emerald-500' : atsResult.score >= 60 ? 'text-amber-500' : 'text-rose-500'} transition-all`} 
+                    />
+                  </svg>
+                  <span className="absolute text-[9px] font-black text-slate-950">{atsResult.score}%</span>
+                </div>
+                <div className="text-left">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Match Score</p>
+                  <p className="text-[11px] font-bold text-slate-700">ATS compatible</p>
+                </div>
+              </div>
+            ) : null}
+            
+            {!isOptimizedForJob && !atsResult && (
+              <button
+                onClick={() => setIsATSModalOpen(true)}
+                className="px-4 py-2.5 bg-blue-600 text-white font-bold text-xs rounded-xl hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-500/20 transition-all flex items-center gap-2 active:scale-95"
+              >
+                <Target className="w-3.5 h-3.5" /> Optimize Details
+              </button>
+            )}
+
+            <button
+              onClick={() => {
+                setIsMatching(false);
+                setMatchedJob(null);
+                router.replace(`/builder/edit?id=${resumeId}`);
+              }}
+              className="px-4 py-2.5 bg-white border border-slate-200 text-slate-650 hover:text-slate-900 hover:bg-slate-50 font-bold text-xs rounded-xl transition-all shadow-sm active:scale-95"
+            >
+              Exit Match
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Split Screen */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left: Form Builder */}
         <aside className="w-full lg:w-1/2 overflow-y-auto p-8 md:p-12 border-r border-slate-200 bg-white custom-scrollbar">
           <div className="max-w-2xl mx-auto space-y-16">
             
+            {/* Bold Tailored Status Alert */}
+            {isMatching && matchedJob && (
+              <div className={`p-6 rounded-[28px] border shadow-sm relative overflow-hidden transition-all duration-500 ${
+                isOptimizedForJob || atsResult
+                  ? 'bg-gradient-to-br from-emerald-50 to-teal-50/50 border-emerald-200/60 shadow-emerald-500/5'
+                  : 'bg-gradient-to-br from-amber-50 to-orange-50/50 border-amber-200/60 shadow-amber-500/5'
+              }`}>
+                {/* Decorative background glow */}
+                <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl opacity-20 ${
+                  isOptimizedForJob || atsResult ? 'bg-emerald-500' : 'bg-amber-500'
+                }`} />
+                
+                <div className="relative z-10 flex gap-4">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-md ${
+                    isOptimizedForJob || atsResult
+                      ? 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/20 text-white'
+                      : 'bg-gradient-to-br from-amber-500 to-orange-600 shadow-amber-500/20 text-white'
+                  }`}>
+                    {isOptimizedForJob || atsResult ? (
+                      <CheckCircle2 className="w-6 h-6 text-white" />
+                    ) : (
+                      <AlertTriangle className="w-6 h-6 text-white animate-bounce" style={{ animationDuration: '2s' }} />
+                    )}
+                  </div>
+                  <div className="space-y-1 min-w-0">
+                    <p className={`text-[10px] font-black uppercase tracking-wider ${
+                      isOptimizedForJob || atsResult ? 'text-emerald-700' : 'text-amber-700'
+                    }`}>
+                      {isOptimizedForJob || atsResult ? '✨ AI Optimization Success' : '⚠️ Action Required'}
+                    </p>
+                    <h4 className="text-base font-black text-slate-900 leading-tight">
+                      {isOptimizedForJob || atsResult 
+                        ? 'Resume Successfully Tailored!' 
+                        : 'Resume Not Yet Tailored to Job'
+                      }
+                    </h4>
+                    <p className="text-slate-650 text-xs font-medium leading-relaxed mt-1.5">
+                      {isOptimizedForJob || atsResult ? (
+                        <>
+                          This resume has been <span className="font-extrabold text-emerald-700">custom-aligned</span> for <span className="font-extrabold text-slate-900">{matchedJob.title}</span> at <span className="font-bold text-slate-900">{matchedJob.company}</span>. Missing keywords and skills have been incorporated to maximize your match score.
+                        </>
+                      ) : (
+                        <>
+                          You are currently editing this resume in matching mode for <span className="font-extrabold text-slate-900">{matchedJob.title}</span> at <span className="font-bold text-slate-900">{matchedJob.company}</span>, but the content has <span className="font-extrabold text-amber-750">not been optimized yet</span>.
+                        </>
+                      )}
+                    </p>
+                    
+                    {!isOptimizedForJob && !atsResult && (
+                      <div className="pt-3">
+                        <button
+                          onClick={() => setIsATSModalOpen(true)}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-amber-700 shadow-md shadow-amber-500/10 active:scale-95 transition-all"
+                        >
+                          <Target className="w-3.5 h-3.5" /> Optimize Now
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Step 1: Edit Resume / Completed: Full Editor */}
             {(onboardingStatus === 'step_1_edit' || (!isOnboarding && activeTab === 'edit')) && (<>
+              {/* AI Resume Generator (Scratch only) */}
+              {showAIPrompt && (
+                <div className="mb-12 p-8 rounded-[32px] bg-white border-2 border-indigo-100 shadow-xl relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50/50 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
+                  <div className="relative z-10 space-y-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-100 flex items-center justify-center">
+                        <Sparkles className="w-6 h-6 text-indigo-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-2xl font-black text-slate-900 tracking-tight">Generate with AI</h3>
+                        <p className="text-slate-500 font-medium">Explain your background and let AI build your complete resume instantly.</p>
+                      </div>
+                    </div>
+                    
+                    <textarea
+                      value={aiPrompt}
+                      onChange={(e) => setAiPrompt(e.target.value)}
+                      placeholder="e.g. I am a marketing manager with 6 years of experience. I previously worked at Tech Innovators and Global Solutions. I am skilled in SEO, content strategy, and team leadership. Generate a professional resume for me."
+                      rows={4}
+                      className="w-full p-4 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium text-slate-800 placeholder:text-slate-400 resize-y"
+                    />
+                    
+                    <div className="flex items-center gap-4">
+                      <button
+                        onClick={handleGenerateResume}
+                        disabled={isGeneratingResume}
+                        className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-md disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {isGeneratingResume ? (
+                          <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Generating...</>
+                        ) : (
+                          <><Sparkles className="w-4 h-4" /> Build Resume</>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Template Selection CTA */}
               <div className="mb-12 p-8 rounded-[32px] bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-2xl shadow-blue-500/20 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl group-hover:bg-white/20 transition-colors duration-700" />
@@ -1100,7 +1549,7 @@ function BuilderEditContent() {
             {((!isOnboarding && activeTab === 'edit') || (isOnboarding && onboardingStatus === 'step_1_edit')) && (
               <div className="pt-12 border-t border-slate-100 flex justify-end">
                 <button
-                  onClick={() => isOnboarding ? advanceStep('step_2_optimize') : setActiveTab('optimize')}
+                  onClick={handleNextStep}
                   className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-3 shadow-xl shadow-blue-500/20 active:scale-95"
                 >
                   Next: Optimize Resume <ArrowRight className="w-4 h-4" />
@@ -1190,18 +1639,61 @@ function BuilderEditContent() {
                 </div>
                 {((!isOnboarding && activeTab === 'optimize') || (isOnboarding && onboardingStatus === 'step_2_optimize')) && (
                   <div className="pt-12 border-t border-slate-100 flex items-center justify-between">
-                    <button
-                      onClick={() => isOnboarding ? advanceStep('step_1_edit') : setActiveTab('edit')}
-                      className="px-6 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-200 transition-all flex items-center gap-2 active:scale-95"
-                    >
-                      <ChevronLeft className="w-4 h-4" /> Back to Edit
-                    </button>
-                    <button
-                      onClick={() => isOnboarding ? advanceStep('step_3_cover_letter') : setActiveTab('cover_letter')}
-                      className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-3 shadow-xl shadow-blue-500/20 active:scale-95"
-                    >
-                      Next: Cover Letter <ArrowRight className="w-4 h-4" />
-                    </button>
+                    {isOnboarding ? (
+                      <>
+                        <button
+                          onClick={() => advanceStep('step_3_cover_letter')}
+                          className="px-6 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-200 transition-all flex items-center gap-2 active:scale-95"
+                        >
+                          Skip Optimization <ChevronRight className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!atsTargetJob.trim()) {
+                              toast.error("Please enter a target job title to optimize against.");
+                              return;
+                            }
+                            const success = await handleApplyAIOptimization();
+                            if (success) advanceStep('step_3_cover_letter');
+                          }}
+                          disabled={isAnalyzing || !atsResult}
+                          className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-3 shadow-xl shadow-blue-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isAnalyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> Optimizing...</> : <>Apply Optimization & Continue <ArrowRight className="w-4 h-4" /></>}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => setActiveTab('edit')}
+                          className="px-6 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-200 transition-all flex items-center gap-2 active:scale-95"
+                        >
+                          <ChevronLeft className="w-4 h-4" /> Back to Edit
+                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={async () => {
+                              if (!atsTargetJob.trim()) {
+                                toast.error("Please enter a target job title to optimize against.");
+                                return;
+                              }
+                              const success = await handleApplyAIOptimization();
+                              if (success) toast.success("Resume optimized successfully!");
+                            }}
+                            disabled={isAnalyzing || !atsResult}
+                            className="px-6 py-4 bg-indigo-50 text-indigo-700 rounded-2xl font-bold text-sm hover:bg-indigo-100 transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed border border-indigo-100"
+                          >
+                            {isAnalyzing ? <><Loader2 className="w-4 h-4 animate-spin" /> Optimizing...</> : <>Apply Optimization <Sparkles className="w-4 h-4" /></>}
+                          </button>
+                          <button
+                            onClick={() => setActiveTab('cover_letter')}
+                            className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-3 shadow-xl shadow-blue-500/20 active:scale-95"
+                          >
+                            Next: Cover Letter <ArrowRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </section>
@@ -1250,22 +1742,48 @@ function BuilderEditContent() {
                   >
                     {isGeneratingCL ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4" /> Generate Cover Letter</>}
                   </button>
+                  {isMatching && (
+                    <p className="text-xs font-semibold text-emerald-700 animate-pulse flex items-center gap-1.5 justify-center mt-2">
+                      <Sparkles className="w-3.5 h-3.5" /> Automatically tailoring your target job specifications.
+                    </p>
+                  )}
                 </div>
 
-                {clContent && (
+                {clContent !== undefined && clContent !== null && clContent !== '' && (
                   <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="font-bold text-slate-900 flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Your Cover Letter</h3>
-                      <button
-                        onClick={() => navigator.clipboard.writeText(clContent)}
-                        className="text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors px-3 py-1.5 rounded-lg hover:bg-blue-50"
-                      >
-                        Copy to Clipboard
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleSaveCoverLetter(clContent)}
+                          disabled={isSavingCL}
+                          className="text-xs font-bold text-emerald-600 hover:text-emerald-700 transition-colors px-3 py-1.5 rounded-lg hover:bg-emerald-50 border border-emerald-100 flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          {isSavingCL ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Save className="w-3.5 h-3.5" />
+                          )}
+                          Save Changes
+                        </button>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(clContent);
+                            toast.success("Cover letter copied to clipboard!");
+                          }}
+                          className="text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors px-3 py-1.5 rounded-lg hover:bg-blue-50 border border-blue-100 flex items-center gap-1.5"
+                        >
+                          Copy
+                        </button>
+                      </div>
                     </div>
-                    <div className="prose prose-sm max-w-none text-slate-700 leading-relaxed whitespace-pre-wrap font-medium">
-                      {clContent}
-                    </div>
+                    <textarea
+                      value={clContent}
+                      onChange={(e) => setClContent(e.target.value)}
+                      placeholder="Your cover letter content will appear here..."
+                      rows={15}
+                      className="w-full p-6 border border-slate-200 rounded-2xl outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all font-serif leading-relaxed text-base text-slate-800 placeholder:text-slate-300 resize-y"
+                    />
                   </div>
                 )}
 
@@ -1279,7 +1797,8 @@ function BuilderEditContent() {
                     </button>
                     <button
                       onClick={() => isOnboarding ? advanceStep('completed') : handleGetMatchingJobs()}
-                      className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-emerald-700 transition-all flex items-center gap-3 shadow-xl shadow-emerald-500/20 active:scale-95"
+                      disabled={isGeneratingCL || !clContent}
+                      className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-emerald-700 transition-all flex items-center gap-3 shadow-xl shadow-emerald-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isOnboarding ? 'Complete & Find Jobs' : 'Find Matching Jobs'} <ArrowRight className="w-4 h-4" />
                     </button>
@@ -1326,6 +1845,14 @@ function BuilderEditContent() {
                <div className="px-4 py-2 bg-white/80 backdrop-blur-md border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400">
                  Template: <span className="text-slate-900">{templateId}</span>
                </div>
+               {!isOnboarding && (
+                 <button 
+                   onClick={handleGetMatchingJobs}
+                   className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:shadow-lg hover:shadow-emerald-500/20 hover:scale-105 transition-all shadow-sm flex items-center gap-2"
+                 >
+                   <Target className="w-4 h-4" /> Search Matching Jobs
+                 </button>
+               )}
             </div>
           </div>
 
@@ -1385,8 +1912,8 @@ function BuilderEditContent() {
       {/* ATS Scan Modal */}
       {isATSModalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
-            <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="p-8 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center">
                   <Sparkles className="w-6 h-6 text-indigo-600" />
@@ -1404,7 +1931,7 @@ function BuilderEditContent() {
               </button>
             </div>
             
-            <div className="p-8 bg-slate-50">
+            <div className="p-8 bg-slate-50 overflow-y-auto flex-1">
               <div className="space-y-6 mb-8">
                 <div className="space-y-2">
                   <label className="text-sm font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
@@ -1526,6 +2053,96 @@ function BuilderEditContent() {
         </div>
       )}
 
+      {/* Bold Tailored Success / Warning Arrival Dialog */}
+      {showArrivalToast && matchedJob && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-[36px] max-w-lg w-full border border-slate-200 shadow-2xl p-8 relative overflow-hidden animate-in zoom-in-95 duration-350">
+            {/* Decorative background gradients */}
+            <div className={`absolute top-0 inset-x-0 h-2 bg-gradient-to-r ${
+              isOptimizedForJob || atsResult ? 'from-emerald-500 to-teal-500' : 'from-amber-500 to-orange-500'
+            }`} />
+            
+            <div className="absolute top-4 right-4">
+              <button 
+                onClick={() => setShowArrivalToast(false)}
+                className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center border border-slate-200/60 text-slate-400 hover:text-slate-900 transition-all active:scale-90"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="text-center space-y-6 pt-4">
+              <div className={`w-20 h-20 mx-auto rounded-3xl flex items-center justify-center shadow-xl ${
+                isOptimizedForJob || atsResult
+                  ? 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/20 text-white'
+                  : 'bg-gradient-to-br from-amber-500 to-orange-600 shadow-amber-500/20 text-white'
+              }`}>
+                {isOptimizedForJob || atsResult ? (
+                  <CheckCircle2 className="w-10 h-10 text-white" />
+                ) : (
+                  <AlertTriangle className="w-10 h-10 text-white" />
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                  isOptimizedForJob || atsResult
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/50'
+                    : 'bg-amber-50 text-amber-800 border border-amber-200/50'
+                }`}>
+                  {isOptimizedForJob || atsResult ? '✨ AI Optimization Active' : '🚨 Tailoring Required'}
+                </span>
+                <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-tight mt-2">
+                  {isOptimizedForJob || atsResult 
+                    ? 'Resume Successfully Tailored!' 
+                    : 'Resume Not Yet Tailored to Job'
+                  }
+                </h3>
+                <p className="text-slate-650 text-sm font-medium mt-1 leading-relaxed max-w-sm mx-auto">
+                  {isOptimizedForJob || atsResult ? (
+                    <>
+                      We've aligned your skills, bullets, and target title perfectly to match <span className="font-extrabold text-slate-900">{matchedJob.title}</span> at <span className="font-bold text-slate-900">{matchedJob.company}</span>.
+                    </>
+                  ) : (
+                    <>
+                      You have entered matching mode for <span className="font-extrabold text-slate-900">{matchedJob.title}</span> at <span className="font-bold text-slate-900">{matchedJob.company}</span>, but the contents are not tailored yet.
+                    </>
+                  )}
+                </p>
+              </div>
+
+              <div className="pt-2 flex flex-col gap-2">
+                {isOptimizedForJob || atsResult ? (
+                  <button
+                    onClick={() => setShowArrivalToast(false)}
+                    className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg hover:shadow-slate-900/10 transition-all active:scale-[0.98]"
+                  >
+                    Start Editing Tailored Resume
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => {
+                        setShowArrivalToast(false);
+                        setIsATSModalOpen(true);
+                      }}
+                      className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-650 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl shadow-blue-500/20 transition-all active:scale-[0.98]"
+                    >
+                      Optimize Resume Now
+                    </button>
+                    <button
+                      onClick={() => setShowArrivalToast(false)}
+                      className="w-full py-3.5 bg-slate-50 hover:bg-slate-100 text-slate-505 hover:text-slate-800 font-bold text-xs uppercase tracking-wider rounded-2xl transition-all active:scale-[0.98]"
+                    >
+                      Edit Manually First
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Validation Error Toast */}
       {showValidationToast && validationErrors.length > 0 && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-md animate-in slide-in-from-bottom-4">

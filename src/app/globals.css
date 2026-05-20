@@ -147,4 +147,47 @@
   .premium-scrollbar::-webkit-scrollbar-thumb {
     @apply bg-[#11253E] rounded-full border-2 border-slate-100 hover:bg-[#1e3a68] transition-colors;
   }
+
+  /* Custom premium scrollbar for dark backgrounds */
+  .premium-scrollbar-dark::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .premium-scrollbar-dark::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.4);
+    border-radius: 9999px;
+  }
+
+  .premium-scrollbar-dark::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.25);
+    border-radius: 9999px;
+    border: 1px solid rgba(59, 130, 246, 0.1);
+  }
+
+  .premium-scrollbar-dark::-webkit-scrollbar-thumb:hover {
+    background: rgba(59, 130, 246, 0.55);
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+  }
+
+  /* Custom premium scrollbar for light backgrounds */
+  .premium-scrollbar-light::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .premium-scrollbar-light::-webkit-scrollbar-track {
+    background: rgba(241, 245, 249, 0.6);
+    border-radius: 9999px;
+  }
+
+  .premium-scrollbar-light::-webkit-scrollbar-thumb {
+    background: rgba(17, 37, 62, 0.2);
+    border-radius: 9999px;
+  }
+
+  .premium-scrollbar-light::-webkit-scrollbar-thumb:hover {
+    background: rgba(59, 130, 246, 0.6);
+  }
 }
+

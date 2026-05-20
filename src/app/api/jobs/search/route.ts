@@ -33,11 +33,19 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { query, location, skills } = body;
+    const { query, location, skills, filters } = body;
 
     let searchContext = "";
     if (skills && Array.isArray(skills) && skills.length > 0) {
-      searchContext = `Generate jobs that match a candidate with these skills: ${skills.join(", ")}`;
+      searchContext = `Generate jobs that match a candidate with these skills: ${skills.join(", ")}.`;
+      if (filters) {
+        searchContext += `\nApply the following constraints to the jobs:\n`;
+        if (filters.location) searchContext += `- Location near: ${filters.location} (or remote if preferred)\n`;
+        if (filters.radius) searchContext += `- Distance: within ${filters.radius} miles\n`;
+        if (filters.isRemote) searchContext += `- Must be 100% Remote\n`;
+        if (filters.jobType) searchContext += `- Employment Type: ${filters.jobType}\n`;
+        if (filters.experienceLevel) searchContext += `- Experience Level: ${filters.experienceLevel}\n`;
+      }
     } else {
       searchContext = `Search Query: "${query || 'Software Engineer'}"\nLocation: "${location || 'Remote'}"`;
     }
@@ -74,16 +82,18 @@ export async function POST(req: NextRequest) {
     const content = await callGeminiWithFallback(prompt);
 
     // Clean any accidental markdown wrapping
-    let cleanedContent = content;
-    if (content.includes("\`\`\`")) {
-      cleanedContent = content.replace(/\`\`\`json\n?|\n?\`\`\`/g, '').trim();
+    let cleanedContent = content.trim();
+    const startIdx = cleanedContent.indexOf('[');
+    const endIdx = cleanedContent.lastIndexOf(']');
+    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+      cleanedContent = cleanedContent.substring(startIdx, endIdx + 1);
     }
 
     let parsedJobs;
     try {
       parsedJobs = JSON.parse(cleanedContent);
     } catch (e) {
-      console.error("Failed to parse Gemini jobs response:", cleanedContent);
+      console.error("Failed to parse Gemini jobs response:", content);
       throw new Error("Invalid response format from AI");
     }
 

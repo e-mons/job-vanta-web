@@ -29,13 +29,23 @@ export async function POST(req: NextRequest) {
       ? `Target Job Title: "${jobTitle}"\nFull Job Description:\n${jobDescription}`
       : `Target Job Title: "${jobTitle || 'General Professional'}"`;
 
+    // Sanitize large base64 photo data to prevent exceeding model API payload limits
+    const originalPhoto = resumeData.personalInfo?.photo;
+    const sanitizedResumeData = { ...resumeData };
+    if (sanitizedResumeData.personalInfo) {
+      sanitizedResumeData.personalInfo = {
+        ...sanitizedResumeData.personalInfo,
+        photo: originalPhoto ? "[BASE64_PHOTO_DATA_REMOVED_FOR_OPTIMIZATION]" : ""
+      };
+    }
+
     const prompt = `
       You are an expert resume optimization AI. Your task is to rewrite and optimize the following resume data to maximize its ATS (Applicant Tracking System) compatibility for the target role.
 
       ${jobContext}
 
       Current Resume Data:
-      ${JSON.stringify(resumeData, null, 2)}
+      ${JSON.stringify(sanitizedResumeData, null, 2)}
 
       Instructions:
       1. Rewrite the summary to be highly targeted for the role
@@ -50,17 +60,24 @@ export async function POST(req: NextRequest) {
 
     const content = await callGeminiWithFallback(prompt);
 
-    let cleanedContent = content;
-    if (content.includes("```")) {
-      cleanedContent = content.replace(/```json\n?|\n?```/g, '').trim();
+    let cleanedContent = content.trim();
+    const startIdx = cleanedContent.indexOf('{');
+    const endIdx = cleanedContent.lastIndexOf('}');
+    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+      cleanedContent = cleanedContent.substring(startIdx, endIdx + 1);
     }
 
     let optimizedData;
     try {
       optimizedData = JSON.parse(cleanedContent);
     } catch (e) {
-      console.error("Failed to parse AI optimization response:", cleanedContent);
+      console.error("Failed to parse AI optimization response:", content);
       throw new Error("Invalid response format from AI");
+    }
+
+    // Restore original photo base64 data
+    if (optimizedData.personalInfo) {
+      optimizedData.personalInfo.photo = originalPhoto || "";
     }
 
     return NextResponse.json({ optimizedData });

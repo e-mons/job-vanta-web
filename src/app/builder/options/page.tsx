@@ -90,11 +90,25 @@ function BuilderOptionsContent() {
   const handleCreateScratch = async () => {
     setIsUploading(true);
     try {
-      const { createResume, data } = useResumeStore.getState();
-      const newId = await createResume('Untitled Resume', data);
+      const { createResume } = useResumeStore.getState();
+      
+      // Explicitly construct an empty resume data object instead of using the cached 'data' from state
+      const emptyData = {
+        personalInfo: { fullName: '', email: '', phone: '', location: '', summary: '', photo: '' },
+        experience: [],
+        education: [],
+        skills: [],
+        projects: [],
+        certifications: [],
+        languages: [],
+        interests: [],
+        references: [],
+      };
+      
+      const newId = await createResume('Untitled Resume', emptyData as any);
       
       if (newId) {
-        router.push(`/builder/edit?id=${newId}`);
+        router.push(`/builder/edit?id=${newId}&source=scratch`);
       } else {
         router.push('/builder/edit');
       }
@@ -153,7 +167,7 @@ function BuilderOptionsContent() {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative max-w-3xl mx-auto">
           <StartMethodCard
             title="From Scratch"
             description="Start with a blank canvas and build step-by-step with AI guidance."
@@ -180,13 +194,15 @@ function BuilderOptionsContent() {
             />
           </div>
 
-          <StartMethodCard
-            title="Scan & Optimize"
-            description="AI analyzes your resume for ATS scoring and keyword gaps."
-            icon="🔍"
-            onClick={() => document.getElementById('upload-resume')?.click()}
-            isLoading={isUploading}
-          />
+          <div className="hidden">
+            <StartMethodCard
+              title="Scan & Optimize"
+              description="AI analyzes your resume for ATS scoring and keyword gaps."
+              icon="🔍"
+              onClick={() => document.getElementById('upload-resume')?.click()}
+              isLoading={isUploading}
+            />
+          </div>
         </div>
 
         <AnimatePresence>
