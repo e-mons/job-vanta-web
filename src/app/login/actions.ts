@@ -90,5 +90,6 @@ export async function resetPassword(formData: FormData) {
     redirect("/reset-password?message=Could not update password. Please try again.");
   }
 
+  await supabase.auth.signOut();
   redirect("/login?message=Password updated successfully! Please sign in.");
 }
