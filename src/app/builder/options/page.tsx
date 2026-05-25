@@ -154,15 +154,15 @@ function BuilderOptionsContent() {
           transition={{ duration: 0.8 }}
           className="text-center mb-20"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-xs font-bold text-blue-600 uppercase tracking-widest mb-6">
-            <Sparkles className="w-4 h-4" />
+          <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/50 text-xs font-black text-blue-700 uppercase tracking-widest mb-8 shadow-sm shadow-blue-500/10">
+            <Sparkles className="w-4 h-4 text-blue-600" />
             Step 2 of 3
           </div>
-          <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-slate-900 mb-8 leading-tight">
+          <h1 className="text-4xl md:text-6xl font-black tracking-tight text-slate-900 mb-8 leading-[1.1]">
             How do you want <br />
-            <span className="text-blue-600">to start?</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">to start?</span>
           </h1>
-          <p className="text-base text-slate-500 max-w-xl mx-auto font-medium">
+          <p className="text-lg text-slate-500 max-w-2xl mx-auto font-medium leading-relaxed">
             Choose a method that works best for you. Whether starting fresh or optimizing an existing profile, we've got you covered.
           </p>
         </motion.div>
@@ -211,24 +211,26 @@ function BuilderOptionsContent() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="mt-16 p-10 rounded-[40px] bg-white border border-blue-100 shadow-2xl shadow-blue-900/5 flex flex-col items-center gap-8 text-center"
+              className="mt-16 p-12 rounded-[48px] bg-white border border-blue-100 shadow-[0_30px_60px_-15px_rgba(37,99,235,0.15)] flex flex-col items-center gap-8 text-center relative overflow-hidden"
             >
-              <div>
-                <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center mb-6 mx-auto">
-                   <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-transparent to-indigo-50/50" />
+              
+              <div className="relative z-10">
+                <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 flex items-center justify-center mb-8 mx-auto shadow-inner">
+                   <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
                 </div>
-                <h3 className="text-2xl font-bold text-slate-900 mb-3">Analyzing with JobVanta AI</h3>
-                <p className="text-slate-500 font-medium">Our Gemini engine is extracting your career highlights and expertise...</p>
+                <h3 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Analyzing with AI</h3>
+                <p className="text-slate-500 font-medium text-lg max-w-md mx-auto">Our Gemini engine is extracting your career highlights and expertise...</p>
               </div>
               
-              <div className="w-full max-w-md">
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Progress</span>
-                  <span className="text-sm font-bold text-blue-600">{uploadProgress}%</span>
+              <div className="w-full max-w-md relative z-10 mt-4">
+                <div className="flex justify-between items-center mb-4 px-1">
+                  <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Processing</span>
+                  <span className="text-sm font-black text-blue-600">{uploadProgress}%</span>
                 </div>
-                <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                <div className="w-full h-4 bg-slate-100 rounded-full overflow-hidden shadow-inner p-0.5">
                   <motion.div 
-                    className="h-full bg-blue-600 rounded-full"
+                    className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full shadow-sm"
                     initial={{ width: 0 }}
                     animate={{ width: `${uploadProgress}%` }}
                     transition={{ duration: 0.5 }}

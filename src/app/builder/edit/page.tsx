@@ -612,7 +612,7 @@ function BuilderEditContent() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
       {/* Top Bar */}
-      <header className="h-20 border-b border-slate-200/60 bg-white/80 backdrop-blur-xl flex items-center justify-between px-8 z-30 sticky top-0">
+      <header className="h-20 border-b border-slate-200/60 bg-white/90 backdrop-blur-2xl flex items-center justify-between px-8 z-30 sticky top-0 shadow-sm shadow-slate-200/50">
         <div className="flex items-center gap-6">
           <Link href="/builder" className="group flex items-center gap-2 px-3 py-2 rounded-2xl hover:bg-slate-50 transition-all">
             <ChevronLeft className="w-5 h-5 text-slate-400 group-hover:text-blue-600 group-hover:-translate-x-1 transition-all" />
@@ -654,13 +654,13 @@ function BuilderEditContent() {
             <>
               <button 
                 onClick={handleGetMatchingJobs}
-                className="px-6 py-3 rounded-2xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 hover:shadow-xl hover:shadow-emerald-500/20 transition-all flex items-center gap-2"
+                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black text-sm hover:from-emerald-600 hover:to-teal-600 hover:shadow-xl hover:shadow-emerald-500/20 transition-all duration-300 flex items-center gap-2 active:scale-95"
               >
                 <Target className="w-4 h-4" /> Find Matching Jobs
               </button>
               <button 
                 onClick={handleExportPDF}
-                className="ml-2 px-6 py-3 rounded-2xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-500/20 transition-all flex items-center gap-2"
+                className="ml-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-sm hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl hover:shadow-blue-500/20 transition-all duration-300 flex items-center gap-2 active:scale-95"
               >
                 <Download className="w-4 h-4" /> Export PDF
               </button>

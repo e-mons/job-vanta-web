@@ -87,7 +87,7 @@ const getStyles = (templateId: string) => {
   }
 };
 
-const ResumeDocument = ({ data, templateId = 'modern' }: { data: ResumeData; templateId?: string }) => {
+export const ResumeDocument = ({ data, templateId = 'modern' }: { data: ResumeData; templateId?: string }) => {
   const styles = getStyles(templateId);
   const isCreative = templateId === 'creative' || templateId === 'bold';
 
