@@ -9,10 +9,10 @@ const testimonials = [
   {
     id: 1,
     name: "Michael Chen",
-    role: "Senior Software Engineer at Google",
+    role: "Senior Software Engineer",
     image: "/assets/avatar_1.png",
-    quote: "JobVanta's AI matching is scarily accurate. It found roles I didn't even know were open, and the ATS optimization helped me land my dream role at Google in just 3 weeks.",
-    success: "Landed role at Google"
+    quote: "JobVanta's AI matching is scarily accurate. It found roles I didn't even know were open, and the ATS optimization helped me land my dream role in Tech in just 3 weeks.",
+    success: "Landed role in Tech"
   },
   {
     id: 2,

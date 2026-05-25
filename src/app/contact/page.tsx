@@ -105,7 +105,7 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Email Us</p>
-                    <p className="text-xl font-bold text-slate-900">support@jobvanta.com</p>
+                    <p className="text-xl font-bold text-slate-900">support@jobvanta.ai</p>
                   </div>
                 </div>
 
@@ -125,7 +125,7 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Visit Us</p>
-                    <p className="text-xl font-bold text-slate-900">Innovation Way, Silicon Valley</p>
+                    <p className="text-xl font-bold text-slate-900">[Your Real Business Address]</p>
                   </div>
                 </div>
               </div>

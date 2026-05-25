@@ -262,7 +262,11 @@ export const useResumeStore = create<ResumeState>()(
           if (state.currentResumeId) debouncedSave(state.currentResumeId, newData);
         },
 
-        setTemplateId: (id) => set({ templateId: id }),
+        setTemplateId: (id) => {
+          const state = get();
+          set({ templateId: id });
+          if (state.currentResumeId) debouncedSave(state.currentResumeId, state.data);
+        },
 
         setResumeData: (data) => {
           const normalizedData = normalizeResumeData(data);
@@ -305,6 +309,7 @@ export const useResumeStore = create<ResumeState>()(
               .from('resumes')
               .update({ 
                 content: data,
+                template_id: get().templateId,
                 updated_at: now
               })
               .eq('id', resumeId);
@@ -323,7 +328,7 @@ export const useResumeStore = create<ResumeState>()(
             set((state) => ({
               userResumes: state.userResumes.map(r =>
                 r.id === resumeId
-                  ? { ...r, content: data, updated_at: now }
+                  ? { ...r, content: data, template_id: get().templateId, updated_at: now }
                   : r
               ),
             }));
@@ -356,6 +361,7 @@ export const useResumeStore = create<ResumeState>()(
                 user_id: user.id,
                 title,
                 content: normalizedData,
+                template_id: get().templateId,
                 onboarding_status: 'step_1_edit',
               })
               .select()
@@ -411,6 +417,7 @@ export const useResumeStore = create<ResumeState>()(
                 user_id: user.id,
                 title: newTitle,
                 content: sourceResume.content,
+                template_id: sourceResume.template_id,
               })
               .select()
               .single();

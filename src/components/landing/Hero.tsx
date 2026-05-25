@@ -9,14 +9,14 @@ const floatingCards = [
   {
     icon: <ShieldCheck className="w-5 h-5 text-blue-400" />,
     title: "ATS Optimized",
-    value: "98% Score",
+    value: "High Score",
     pos: "top-[15%] left-[5%] lg:left-[15%]",
     delay: 0.2
   },
   {
     icon: <Search className="w-5 h-5 text-blue-400" />,
     title: "New Roles",
-    value: "2,500+ Today",
+    value: "Updated Daily",
     pos: "top-[25%] right-[5%] lg:right-[15%]",
     delay: 0.4
   },

@@ -40,7 +40,7 @@ export const PLANS: Plan[] = [
   {
     id: 'pro',
     name: 'Pro',
-    price: '29',
+    price: '9.99',
     priceId: 'pdt_0Newfu26VwAPCKJBoT8z5',
     description: 'Most popular for active job seekers',
     features: [
@@ -59,7 +59,7 @@ export const PLANS: Plan[] = [
   {
     id: 'enterprise',
     name: 'Enterprise',
-    price: '99',
+    price: '14.99',
     priceId: 'pdt_0NewgKeXYMkBEofXpxy9Z',
     description: 'Executive-level career management',
     features: [

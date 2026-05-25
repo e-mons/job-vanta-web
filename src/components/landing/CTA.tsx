@@ -41,7 +41,7 @@ export default function CTA() {
             </h2>
             
             <p className="text-lg md:text-xl text-slate-400 max-w-2xl mb-12 leading-relaxed">
-              Don&apos;t leave your career to chance. Join 45,000+ professionals using AI to land higher-paying roles at top-tier tech companies.
+              Don&apos;t leave your career to chance. Join ambitious professionals using AI to land higher-paying roles at top-tier tech companies.
             </p>
             
             <div className="flex flex-col sm:flex-row items-center gap-6">
@@ -67,7 +67,7 @@ export default function CTA() {
             {/* Floating Avatars / Proof */}
             <div className="mt-16 flex flex-wrap items-center justify-center gap-12 pt-16 border-t border-white/5 w-full">
               <div className="text-center">
-                <div className="text-3xl font-bold text-white mb-1">98%</div>
+                <div className="text-3xl font-bold text-white mb-1">High</div>
                 <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Success Rate</div>
               </div>
               <div className="text-center">

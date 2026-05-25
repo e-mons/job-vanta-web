@@ -14,6 +14,7 @@ const JobSchema = z.object({
   location: z.string(),
   isRemote: z.boolean(),
   salary: z.string().nullable().optional(),
+  contactEmail: z.string().nullable().optional(),
   applyLink: z.string(),
   description: z.string(),
   type: z.string(),
@@ -50,10 +51,21 @@ export async function POST(req: NextRequest) {
       searchContext = `Search Query: "${query || 'Software Engineer'}"\nLocation: "${location || 'Remote'}"`;
     }
 
+    const todayISO = new Date().toISOString();
+
     const prompt = `
-      You are the AI Search Engine for JobVanta. Generate 6 realistic job postings based on the following search criteria.
+      You are the AI Search Engine for JobVanta. Generate 15 realistic, diverse job postings based on the following search criteria.
       
       ${searchContext}
+      
+      IMPORTANT RULES:
+      - Today's date is ${todayISO}. ALL "postedAt" dates MUST be within the last 7 days from today. Generate varied dates within that range (some today, some 1-3 days ago, some 4-7 days ago).
+      - Generate jobs from well-known, real companies as well as realistic mid-size and startup companies. Use a good mix.
+      - For "contactEmail": Generate a realistic HR/recruiting email address for each company (e.g., careers@company.com, recruiting@company.com, talent@company.com, jobs@company.com, hr@company.com, hiring@company.com). Use the company's actual domain if it's a well-known company. Always try your absolute best to provide a contactEmail for every job. Only set it to null as a very last resort.
+      - For "applyLink": Use the company's real careers page URL if it's a well-known company, otherwise generate a realistic one.
+      - Make descriptions detailed (2-3 paragraphs), responsibilities specific (5-8 items), qualifications realistic (4-6 items), and benefits appealing (4-6 items).
+      - Vary the salary ranges realistically based on role seniority and location.
+      - Use real company logos via clearbit: https://logo.clearbit.com/{domain}
       
       Return ONLY a raw JSON array of objects. Do not wrap it in markdown code blocks.
       Each object MUST match this JSON structure EXACTLY:
@@ -61,17 +73,18 @@ export async function POST(req: NextRequest) {
         "id": "uuid-string-here",
         "title": "Job Title",
         "company": "Company Name",
-        "companyLogo": "https://logo.clearbit.com/apple.com", // use clearbit logos based on company domain if possible, or leave null
+        "companyLogo": "https://logo.clearbit.com/company.com",
         "companyDescription": "Brief description of the company",
         "location": "City, State or Remote",
         "isRemote": true/false,
         "salary": "$100k - $150k",
-        "applyLink": "https://example.com/apply",
+        "contactEmail": "careers@company.com",
+        "applyLink": "https://company.com/careers",
         "description": "Full job description (2-3 paragraphs)...",
         "type": "Full-time",
         "employmentType": "Full-time",
         "source": "JobVanta",
-        "postedAt": "2024-05-14T10:00:00Z", // Use recent ISO dates
+        "postedAt": "ISO date within last 7 days",
         "skills": ["Skill 1", "Skill 2"],
         "responsibilities": ["Responsibility 1", "Responsibility 2"],
         "qualifications": ["Qualification 1", "Qualification 2"],

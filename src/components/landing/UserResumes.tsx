@@ -37,7 +37,7 @@ export default function UserResumes() {
       return;
     }
     setIsDuplicating(id);
-    await duplicateResume(id, `${title || "Untitled"} (Copy)`);
+    await duplicateResume(id, `${title || "My Professional Resume"} (Copy)`);
     setIsDuplicating(null);
   };
 
@@ -132,7 +132,7 @@ export default function UserResumes() {
               </div>
 
               <h3 className="text-2xl font-bold text-slate-900 mb-3 group-hover:text-blue-600 transition-colors truncate">
-                {resume.title || "Untitled Resume"}
+                {resume.title || "My Professional Resume"}
               </h3>
               <p className="text-[15px] text-slate-500 font-medium mb-10 line-clamp-2 leading-relaxed flex-1">
                 Your professional profile is ready for new opportunities. Keep it updated for better AI matching.

@@ -21,14 +21,36 @@ import {
 } from "lucide-react";
 import JobCard from "@/components/jobs/JobCard";
 import ResumeSelector from "@/components/jobs/ResumeSelector";
-import JobDetailsModal from "@/components/jobs/JobDetailsModal";
-import ApplyModal from "@/components/jobs/ApplyModal";
+import EmailProviderModal from "@/components/jobs/EmailProviderModal";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useJobStore, Job } from "@/store/useJobStore";
 import { useResumeStore, UserResume } from "@/store/useResumeStore";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
+import { toast } from "sonner";
+
+/**
+ * Build a mailto: URL with pre-filled subject and body for job applications.
+ * Falls back to the job's applyLink if no contactEmail is available.
+ */
+function buildMailtoUrl(job: Job, resume: UserResume | null): string {
+  const resumeData = resume?.content;
+  const fullName = resumeData?.personalInfo?.fullName || "Applicant";
+  const userEmail = resumeData?.personalInfo?.email || "";
+  const userPhone = resumeData?.personalInfo?.phone || "";
+  const topSkills = (resumeData?.skills || []).slice(0, 5).join(", ") || "relevant skills";
+  const latestExp = resumeData?.experience?.[0];
+  const latestRole = latestExp?.role || "my previous role";
+  const latestCompany = latestExp?.company || "my previous company";
+  const firstBullet = latestExp?.bullets?.[0] || "delivered impactful results";
+
+  const subject = `Application for ${job.title} — ${fullName}`;
+  const body = `Dear Hiring Manager,\n\nI am writing to express my strong interest in the ${job.title} position at ${job.company}, as listed on JobVanta.\n\nWith experience in ${topSkills}, I believe I would be a strong fit for this role. My background includes ${latestRole} at ${latestCompany}, where I ${firstBullet}.\n\nI have attached my resume for your review and would welcome the opportunity to discuss how my skills and experience align with your team's needs.\n\nThank you for your consideration. I look forward to hearing from you.\n\nBest regards,\n${fullName}${userEmail ? `\n${userEmail}` : ""}${userPhone ? `\n${userPhone}` : ""}`;
+
+  const emailTo = job.contactEmail ? encodeURIComponent(job.contactEmail) : "";
+  return `mailto:${emailTo}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
 
 function JobsPageContent() {
   const { 
@@ -56,9 +78,7 @@ function JobsPageContent() {
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
   
   // Modal states
-  const [applyingJob, setApplyingJob] = useState<Job | null>(null);
-  const [isApplyOpen, setIsApplyOpen] = useState(false);
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
 
   const searchParams = useSearchParams();
   const resumeIdParam = searchParams.get("resumeId");
@@ -108,14 +128,12 @@ function JobsPageContent() {
 
   const handleViewJob = (job: Job) => {
     setSelectedJob(job);
-    setIsDetailsOpen(true);
+    router.push(`/jobs/${job.id}`);
   };
 
-  const handleOpenApply = () => {
-    if (selectedJob) {
-      setApplyingJob(selectedJob);
-      setIsApplyOpen(true);
-    }
+  const handleApplyNow = () => {
+    if (!selectedJob) return;
+    setIsEmailModalOpen(true);
   };
 
   return (
@@ -453,22 +471,12 @@ function JobsPageContent() {
           </AnimatePresence>
         </div>
 
-        {/* Modals */}
-        <JobDetailsModal 
+        {/* Email Provider Selection Modal */}
+        <EmailProviderModal
           job={selectedJob}
-          isOpen={isDetailsOpen}
-          onClose={() => setIsDetailsOpen(false)}
-          onApply={handleOpenApply}
-        />
-
-        <ApplyModal 
-          job={applyingJob}
           resume={selectedResume}
-          isOpen={isApplyOpen}
-          onClose={() => setIsApplyOpen(false)}
-          onSuccess={() => {
-            // Maybe refresh search results or show a success message
-          }}
+          isOpen={isEmailModalOpen}
+          onClose={() => setIsEmailModalOpen(false)}
         />
       </div>
     </DashboardLayout>

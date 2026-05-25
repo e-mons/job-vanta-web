@@ -178,7 +178,7 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="space-y-1">
-                      <h4 className="text-xl font-black text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1">{resume.title || 'Untitled Resume'}</h4>
+                      <h4 className="text-xl font-black text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1">{resume.title || 'My Professional Resume'}</h4>
                       <p className="text-xs text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">
                         <Clock className="w-3.5 h-3.5" />
                         Last edited {formatDate(resume.updated_at)}

@@ -79,7 +79,7 @@ export default function TermsPage() {
             <p className="text-slate-600 leading-relaxed">
               Questions about the Terms of Service should be sent to us at:
               <br />
-              <span className="font-semibold text-[#11253E]">legal@jobvanta.com</span>
+              <span className="font-semibold text-[#11253E]">legal@jobvanta.ai</span>
             </p>
           </section>
         </div>

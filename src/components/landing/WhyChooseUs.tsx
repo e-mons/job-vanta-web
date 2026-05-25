@@ -31,7 +31,7 @@ const tabs = [
     icon: <ShieldCheck className="w-4 h-4" />,
     title: "100% Verified Opportunities",
     desc: "We partner directly with top-tier companies to ensure every job posting on JobVanta is authentic and active.",
-    featureTitle: "Trusted Partners",
+    featureTitle: "Top Companies",
     featureDesc: "Skip the spam and focus on roles that are actually hiring today.",
     mainImage: "/assets/professional_job_seeker_blue.png"
   },
@@ -161,7 +161,7 @@ export default function WhyChooseUs() {
                     <div className="glass px-6 py-4 rounded-2xl flex items-center justify-between">
                       <div>
                         <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Career Match</p>
-                        <p className="text-white font-bold">98% Alignment</p>
+                        <p className="text-white font-bold">High Alignment</p>
                       </div>
                       <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
                         <CheckCircle2 className="w-5 h-5 text-white" />

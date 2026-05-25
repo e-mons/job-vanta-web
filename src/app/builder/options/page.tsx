@@ -105,7 +105,7 @@ function BuilderOptionsContent() {
         references: [],
       };
       
-      const newId = await createResume('Untitled Resume', emptyData as any);
+      const newId = await createResume('My Professional Resume', emptyData as any);
       
       if (newId) {
         router.push(`/builder/edit?id=${newId}&source=scratch`);

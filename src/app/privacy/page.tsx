@@ -77,7 +77,7 @@ export default function PrivacyPage() {
             <p className="text-slate-600 leading-relaxed">
               If you have any questions about this Privacy Policy, please contact us at:
               <br />
-              <span className="font-semibold text-[#11253E]">privacy@jobvanta.com</span>
+              <span className="font-semibold text-[#11253E]">privacy@jobvanta.ai</span>
             </p>
           </section>
         </div>

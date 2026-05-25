@@ -422,11 +422,15 @@ function BuilderEditContent() {
         const resume = userResumes.find(r => r.id === resumeId);
         if (resume) {
           setResumeData(resume.content);
+          if (resume.template_id) useResumeStore.getState().setTemplateId(resume.template_id);
           hasLoadedData[1](true);
         } else {
           fetchUserResumes().then(() => {
             const r = useResumeStore.getState().userResumes.find(res => res.id === resumeId);
-            if (r) setResumeData(r.content);
+            if (r) {
+              setResumeData(r.content);
+              if (r.template_id) useResumeStore.getState().setTemplateId(r.template_id);
+            }
             hasLoadedData[1](true);
           });
         }

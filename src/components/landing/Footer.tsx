@@ -78,7 +78,7 @@ export default function Footer() {
           <div className="lg:pl-12">
             <h4 className="text-xl font-black text-white mb-8 tracking-tight">Contact</h4>
             <div className="space-y-4 mb-10">
-              <a href="mailto:support@jobvanta.com" className="flex items-center gap-2 text-slate-400 hover:text-blue-400 font-bold transition-all group">
+              <a href="mailto:support@jobvanta.ai" className="flex items-center gap-2 text-slate-400 hover:text-blue-400 font-bold transition-all group">
                 Support Email <ExternalLink className="w-3 h-3 opacity-50 group-hover:opacity-100" />
               </a>
               <a href="#" className="flex items-center gap-2 text-slate-400 hover:text-blue-400 font-bold transition-all group">

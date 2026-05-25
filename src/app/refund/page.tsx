@@ -77,7 +77,7 @@ export default function RefundPage() {
             <p className="text-slate-600 leading-relaxed">
               To request a refund, please email our support team with your account details and order number at:
               <br />
-              <span className="font-semibold text-[#11253E]">billing@jobvanta.com</span>
+              <span className="font-semibold text-[#11253E]">billing@jobvanta.ai</span>
             </p>
           </section>
         </div>

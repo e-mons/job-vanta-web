@@ -13,6 +13,7 @@ export interface Job {
   location: string;
   isRemote: boolean;
   salary: string | null;
+  contactEmail?: string | null;
   applyLink: string;
   description: string;
   type: string;

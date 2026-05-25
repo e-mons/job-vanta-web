@@ -6,20 +6,20 @@ import Image from 'next/image';
 const testimonials = [
   {
     name: "Sarah Jenkins",
-    role: "Product Manager @ Google",
-    image: "/assets/avatar_1_1778094262100.png",
+    role: "Early Access User",
+    image: "/assets/avatar_1.png",
     quote: "JobVanta completely transformed my job search. The AI optimized my resume in seconds, and I started getting interviews within a week. The templates are gorgeous."
   },
   {
     name: "David Chen",
     role: "Senior Full Stack Engineer",
-    image: "/assets/avatar_2_1778094460163.png",
+    image: "/assets/avatar_2.png",
     quote: "As a developer, I hate writing resumes. This platform took my scattered experience and turned it into a cohesive narrative. Landed 3 offers after using it."
   },
   {
     name: "Elena Rodriguez",
     role: "Marketing Director",
-    image: "/assets/avatar_3_1778094605849.png",
+    image: "/assets/avatar_3.png",
     quote: "The ATS scanner is a game changer. It told me exactly what keywords I was missing. The UI is incredibly slick and easy to use."
   }
 ];

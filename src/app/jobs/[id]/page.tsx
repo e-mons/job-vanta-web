@@ -23,7 +23,9 @@ import {
   Target,
   ChevronRight,
   TrendingUp,
-  Info
+  Info,
+  Mail,
+  AlertTriangle
 } from "lucide-react";
 import { useJobStore } from "@/store/useJobStore";
 import { useResumeStore, UserResume } from "@/store/useResumeStore";
@@ -31,7 +33,27 @@ import { useSubscriptionStore } from "@/store/useSubscription";
 import { Skeleton } from "@/components/ui/Skeleton";
 import MobileBottomNav from "@/components/navigation/MobileBottomNav";
 import CompanyLogo from "@/components/jobs/CompanyLogo";
-import ApplyModal from "@/components/jobs/ApplyModal";
+import EmailProviderModal from "@/components/jobs/EmailProviderModal";
+import { toast } from "sonner";
+import { Job } from "@/store/useJobStore";
+
+function buildMailtoUrl(job: Job, resume: UserResume | null): string {
+  const resumeData = resume?.content;
+  const fullName = resumeData?.personalInfo?.fullName || "Applicant";
+  const userEmail = resumeData?.personalInfo?.email || "";
+  const userPhone = resumeData?.personalInfo?.phone || "";
+  const topSkills = (resumeData?.skills || []).slice(0, 5).join(", ") || "relevant skills";
+  const latestExp = resumeData?.experience?.[0];
+  const latestRole = latestExp?.role || "my previous role";
+  const latestCompany = latestExp?.company || "my previous company";
+  const firstBullet = latestExp?.bullets?.[0] || "delivered impactful results";
+
+  const subject = `Application for ${job.title} — ${fullName}`;
+  const body = `Dear Hiring Manager,\n\nI am writing to express my strong interest in the ${job.title} position at ${job.company}, as listed on JobVanta.\n\nWith experience in ${topSkills}, I believe I would be a strong fit for this role. My background includes ${latestRole} at ${latestCompany}, where I ${firstBullet}.\n\nI have attached my resume for your review and would welcome the opportunity to discuss how my skills and experience align with your team's needs.\n\nThank you for your consideration. I look forward to hearing from you.\n\nBest regards,\n${fullName}${userEmail ? `\n${userEmail}` : ""}${userPhone ? `\n${userPhone}` : ""}`;
+
+  const emailTo = job.contactEmail ? encodeURIComponent(job.contactEmail) : "";
+  return `mailto:${emailTo}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
 
 
 export default function JobDetailsPage() {
@@ -42,8 +64,8 @@ export default function JobDetailsPage() {
   const { userResumes, fetchUserResumes } = useResumeStore();
   const { isPremium } = useSubscriptionStore();
   const [isSaving, setIsSaving] = useState(false);
-  const [isApplyOpen, setIsApplyOpen] = useState(false);
   const [selectedResume, setSelectedResume] = useState<UserResume | null>(null);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
 
   useEffect(() => {
     fetchSavedJobs();
@@ -323,21 +345,21 @@ export default function JobDetailsPage() {
                   </button>
                   
                   <button 
-                    onClick={() => setIsApplyOpen(true)}
+                    onClick={() => setIsEmailModalOpen(true)}
                     className="w-full p-5 rounded-2xl bg-slate-900 text-white font-black text-sm hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 active:scale-[0.98] flex items-center justify-center gap-3"
                   >
-                    <Send className="w-4 h-4" />
-                    Apply Now
+                    <Mail className="w-4 h-4" />
+                    Apply via Email
                   </button>
 
-                  {selectedJob.applyLink && selectedJob.applyLink !== 'https://example.com/apply' && (
+                  {selectedJob.company && (
                     <a 
-                      href={selectedJob.applyLink}
+                      href={`https://www.google.com/search?q=${encodeURIComponent(selectedJob.company + ' careers ' + selectedJob.title)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="w-full p-4 rounded-2xl bg-white text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all border border-slate-200 active:scale-[0.98] flex items-center justify-center gap-2"
                     >
-                      Apply on Company Site
+                      Search Company Site
                       <ExternalLink className="w-4 h-4" />
                     </a>
                   )}
@@ -406,16 +428,21 @@ export default function JobDetailsPage() {
 
       <MobileBottomNav />
 
-      {/* Apply Modal */}
-      <ApplyModal
+      {/* Email Provider Selection Modal */}
+      <EmailProviderModal
         job={selectedJob}
         resume={selectedResume}
-        isOpen={isApplyOpen}
-        onClose={() => setIsApplyOpen(false)}
-        onSuccess={() => {
-          setIsApplyOpen(false);
-        }}
+        isOpen={isEmailModalOpen}
+        onClose={() => setIsEmailModalOpen(false)}
       />
+
+      {/* Employer Email Info */}
+      {selectedJob.contactEmail && (
+        <div className="fixed bottom-24 lg:bottom-6 right-6 z-40 px-4 py-3 rounded-2xl bg-emerald-50 border border-emerald-200 shadow-lg flex items-center gap-3 text-sm font-bold text-emerald-700 max-w-xs">
+          <Mail className="w-4 h-4 flex-shrink-0" />
+          <span className="truncate">{selectedJob.contactEmail}</span>
+        </div>
+      )}
     </div>
   );
 }

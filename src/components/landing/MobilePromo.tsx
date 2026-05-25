@@ -57,29 +57,21 @@ export default function MobilePromo() {
               </div>
               
               <div className="flex flex-wrap items-center gap-4 pt-4">
-                <a href="#" className="flex items-center gap-3 px-8 py-4 rounded-2xl bg-white text-slate-950 hover:bg-slate-100 transition-all shadow-xl hover:-translate-y-1">
-                  <Apple className="w-8 h-8" />
+                <div className="flex items-center gap-3 px-8 py-4 rounded-2xl glass-dark border border-white/10 text-white shadow-xl opacity-80 cursor-not-allowed">
                   <div className="flex flex-col">
-                    <span className="text-[10px] text-slate-500 uppercase font-black tracking-wider leading-none">Download on</span>
-                    <span className="text-lg font-black leading-tight">App Store</span>
+                    <span className="text-[10px] text-white/40 uppercase font-black tracking-wider leading-none">In Development</span>
+                    <span className="text-lg font-black leading-tight">Mobile Apps Coming Soon</span>
                   </div>
-                </a>
-                <a href="#" className="flex items-center gap-3 px-8 py-4 rounded-2xl glass-dark border border-white/10 text-white hover:bg-white/5 transition-all shadow-xl hover:-translate-y-1">
-                  <PlayCircle className="w-8 h-8 text-blue-500" />
-                  <div className="flex flex-col">
-                    <span className="text-[10px] text-white/40 uppercase font-black tracking-wider leading-none">Get it on</span>
-                    <span className="text-lg font-black leading-tight">Google Play</span>
-                  </div>
-                </a>
+                </div>
               </div>
 
-              <div className="mt-8 flex items-center gap-6 p-6 rounded-[2rem] glass-dark border border-white/10 w-fit group cursor-pointer hover:border-blue-500/50 transition-colors">
-                 <div className="p-3 bg-white rounded-2xl group-hover:scale-110 transition-transform">
+              <div className="mt-8 flex items-center gap-6 p-6 rounded-[2rem] glass-dark border border-white/10 w-fit group opacity-50">
+                 <div className="p-3 bg-white rounded-2xl">
                    <QrCode className="w-12 h-12 text-slate-900" />
                  </div>
                  <div>
-                   <div className="font-black text-white text-base">Scan to Download</div>
-                   <div className="text-slate-400 text-xs font-medium">Available for iOS & Android</div>
+                   <div className="font-black text-white text-base">App in Review</div>
+                   <div className="text-slate-400 text-xs font-medium">Coming soon for iOS & Android</div>
                  </div>
               </div>
             </motion.div>

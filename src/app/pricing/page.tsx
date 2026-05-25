@@ -143,7 +143,7 @@ export default function PricingPage() {
               </div>
               <div className="text-center md:text-left">
                 <p className="text-slate-900 font-bold text-base sm:text-lg">Need a custom plan for your team?</p>
-                <p className="text-slate-500 text-xs sm:text-sm font-medium mt-1">Join 500+ companies hiring through JobVanta.</p>
+                <p className="text-slate-500 text-xs sm:text-sm font-medium mt-1">Join top companies hiring through JobVanta.</p>
               </div>
               <Link
                 href="/contact"

@@ -16,7 +16,7 @@ export default function TrustedCompanies() {
           viewport={{ once: true }}
           className="text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-8"
         >
-          Our Trusted Partners
+          Jobs from top global companies
         </motion.p>
         
         <div className="relative flex overflow-hidden group">
