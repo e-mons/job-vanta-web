@@ -1,6 +1,6 @@
 "use client";
 
-import { Heart, ExternalLink, MapPin, Building2, Clock, Zap, Lock, ArrowRight } from "lucide-react";
+import { Heart, ExternalLink, MapPin, Building2, Clock, Zap, Lock, ArrowRight, Loader2 } from "lucide-react";
 import { Job, useJobStore } from "@/store/useJobStore";
 import { useResumeStore } from "@/store/useResumeStore";
 import { useSubscriptionStore } from "@/store/useSubscription";
@@ -47,6 +47,7 @@ export default function JobCard({ job, index, onApply }: JobCardProps) {
   const { isPremium } = useSubscriptionStore();
   const resumeSkills = useResumeStore((s) => s.data.skills);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [isTogglingSave, setIsTogglingSave] = useState(false);
 
   const [logoError, setLogoError] = useState(false);
   const premium = isPremium();
@@ -60,13 +61,23 @@ export default function JobCard({ job, index, onApply }: JobCardProps) {
     return Math.round((matches.length / job.skills.length) * 100);
   }, [job.skills, resumeSkills]);
 
-  const handleToggleSave = (e: React.MouseEvent) => {
+  const handleToggleSave = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isSaved) {
-      const savedEntry = savedJobs.find((sj) => sj.metadata?.id === job.id);
-      if (savedEntry) unsaveJob(savedEntry.id);
-    } else {
-      saveJob(job);
+    if (isTogglingSave) return;
+    setIsTogglingSave(true);
+    try {
+      if (isSaved) {
+        const savedEntry = savedJobs.find((sj) => sj.metadata?.id === job.id);
+        if (savedEntry) {
+          await unsaveJob(savedEntry.id);
+        }
+      } else {
+        await saveJob(job);
+      }
+    } catch (err) {
+      console.error("Failed to toggle save state:", err);
+    } finally {
+      setIsTogglingSave(false);
     }
   };
 
@@ -93,13 +104,18 @@ export default function JobCard({ job, index, onApply }: JobCardProps) {
 
             <button
               onClick={handleToggleSave}
+              disabled={isTogglingSave}
               className={`p-3.5 rounded-2xl border transition-all duration-300 ${
                 isSaved
                   ? "bg-rose-50 border-rose-100 text-rose-500"
                   : "bg-slate-50 border-slate-100 text-slate-300 hover:text-rose-500 hover:border-rose-200"
-              }`}
+              } ${isTogglingSave ? "opacity-60 cursor-not-allowed" : ""}`}
             >
-              <Heart className={`w-5 h-5 ${isSaved ? "fill-current" : ""}`} />
+              {isTogglingSave ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Heart className={`w-5 h-5 ${isSaved ? "fill-current" : ""}`} />
+              )}
             </button>
           </div>
 
@@ -161,14 +177,21 @@ export default function JobCard({ job, index, onApply }: JobCardProps) {
           <div className="mt-6 relative z-20">
             <button
               onClick={handleToggleSave}
+              disabled={isTogglingSave}
               className={`group/btn w-full py-3 rounded-2xl font-black text-[11px] uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 border shadow-sm active:scale-[0.98] ${
                 isSaved
                   ? "bg-rose-500 border-rose-500 text-white hover:bg-rose-600 hover:border-rose-600 hover:shadow-lg hover:shadow-rose-600/20"
                   : "bg-slate-50/80 border-slate-200/80 text-slate-700 hover:bg-blue-600 hover:text-white hover:border-blue-600 hover:shadow-lg hover:shadow-blue-600/10"
-              }`}
+              } ${isTogglingSave ? "opacity-70 cursor-not-allowed" : ""}`}
             >
-              <Heart className={`w-3.5 h-3.5 ${isSaved ? "fill-current text-white" : "text-slate-400 group-hover/btn:text-white transition-colors"}`} />
-              {isSaved ? "UnSave Job" : "Save Job"}
+              {isTogglingSave ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Heart className={`w-3.5 h-3.5 ${isSaved ? "fill-current text-white" : "text-slate-400 group-hover/btn:text-white transition-colors"}`} />
+              )}
+              {isTogglingSave 
+                ? (isSaved ? "Unsaving..." : "Saving...") 
+                : (isSaved ? "Unsave Job" : "Save Job")}
             </button>
           </div>
 

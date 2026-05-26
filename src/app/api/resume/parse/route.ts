@@ -100,12 +100,12 @@ export async function POST(req: NextRequest) {
 
     const validatedData = ExtractedResumeSchema.parse(data);
 
-    // Assign IDs
+    // Assign fresh IDs (ignore AI hallucinated ones which might be duplicates)
     const finalData = {
       ...validatedData,
-      experience: validatedData.experience.map(exp => ({ ...exp, id: exp.id || uuidv4() })),
-      education: validatedData.education.map(edu => ({ ...edu, id: edu.id || uuidv4() })),
-      projects: validatedData.projects.map(proj => ({ ...proj, id: proj.id || uuidv4() }))
+      experience: validatedData.experience.map(exp => ({ ...exp, id: uuidv4() })),
+      education: validatedData.education.map(edu => ({ ...edu, id: uuidv4() })),
+      projects: validatedData.projects.map(proj => ({ ...proj, id: uuidv4() }))
     };
 
     return NextResponse.json({ success: true, data: finalData });

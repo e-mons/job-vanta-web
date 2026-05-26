@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ResumeData, useResumeStore } from '@/store/useResumeStore';
 import { Mail, Phone, MapPin, Globe, Award, GraduationCap } from 'lucide-react';
 import { toast } from 'sonner';
@@ -9,9 +9,35 @@ interface HTMLPreviewProps {
   data: ResumeData;
   templateId?: string;
   scale?: number;
+  autoScale?: boolean;
 }
 
-export default function HTMLPreview({ data, templateId = 'modern', scale = 1 }: HTMLPreviewProps) {
+export default function HTMLPreview({ data, templateId = 'modern', scale = 1, autoScale = false }: HTMLPreviewProps) {
+  const [dynamicScale, setDynamicScale] = useState(scale);
+  const [contentHeight, setContentHeight] = useState(1123); // Default A4 height (297mm @ 96dpi)
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const adjustScale = () => {
+      const width = window.innerWidth;
+      const newScale = autoScale ? (width / 794) : scale;
+      setDynamicScale(newScale);
+
+      if (containerRef.current) {
+        setContentHeight(containerRef.current.scrollHeight);
+      }
+    };
+
+    adjustScale();
+    const t = setTimeout(adjustScale, 100);
+
+    window.addEventListener('resize', adjustScale);
+    return () => {
+      window.removeEventListener('resize', adjustScale);
+      clearTimeout(t);
+    };
+  }, [autoScale, scale, data, templateId]);
+
   const renderTemplate = () => {
     switch (templateId) {
       case 'modern': return <ModernTemplate data={data} />;
@@ -30,14 +56,24 @@ export default function HTMLPreview({ data, templateId = 'modern', scale = 1 }: 
 
   return (
     <div 
-      className="bg-white shadow-2xl origin-top-left transition-transform duration-300 ease-out overflow-hidden"
-      style={{ 
-        width: '210mm', 
-        minHeight: '297mm', 
-        transform: `scale(${scale})`,
+      className="overflow-hidden"
+      style={{
+        width: autoScale ? '100%' : 'auto',
+        height: autoScale ? `${contentHeight * dynamicScale}px` : 'auto',
       }}
     >
-      {renderTemplate()}
+      <div 
+        ref={containerRef}
+        className="bg-white shadow-2xl origin-top-left transition-transform duration-300 ease-out overflow-hidden"
+        style={{ 
+          width: '210mm', 
+          minHeight: '297mm', 
+          transform: `scale(${dynamicScale})`,
+          flexShrink: 0,
+        }}
+      >
+        {renderTemplate()}
+      </div>
     </div>
   );
 }
@@ -46,7 +82,15 @@ const PhotoUploadWrapper = ({ children }: { children: React.ReactNode }) => {
   const updatePersonalInfo = useResumeStore((state) => state.updatePersonalInfo);
 
   return (
-    <label className="relative group cursor-pointer block w-full h-full">
+    <label 
+      className="relative group cursor-pointer block w-full h-full"
+      onClick={(e) => {
+        if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
+          e.preventDefault();
+          (window as any).ReactNativeWebView.postMessage(JSON.stringify({ type: 'UPLOAD_PHOTO' }));
+        }
+      }}
+    >
       {children}
       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity rounded-full z-10 backdrop-blur-sm">
         <span className="text-white text-[10px] font-bold uppercase tracking-wider text-center px-2">Change<br/>Photo</span>

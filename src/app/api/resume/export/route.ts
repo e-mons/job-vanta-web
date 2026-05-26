@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { renderToStream } from "@react-pdf/renderer";
 import React from "react";
-import { ResumeDocument } from "@/components/builder/Preview/PDFPreview";
+import { ResumeDocument } from "@/components/builder/Preview/ResumeDocument";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export async function GET(req: NextRequest) {

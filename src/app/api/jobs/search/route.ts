@@ -54,12 +54,12 @@ export async function POST(req: NextRequest) {
     const todayISO = new Date().toISOString();
 
     const prompt = `
-      You are the AI Search Engine for JobVanta. Generate 15 realistic, diverse job postings based on the following search criteria.
+      You are the AI Search Engine for JobVanta. Generate 30 realistic, diverse job postings based on the following search criteria.
       
       ${searchContext}
       
       IMPORTANT RULES:
-      - Today's date is ${todayISO}. ALL "postedAt" dates MUST be within the last 7 days from today. Generate varied dates within that range (some today, some 1-3 days ago, some 4-7 days ago).
+      - Today's date is ${todayISO}. ALL "postedAt" dates MUST be within the last 1 to 4 days from today to ensure they are the most recent, real-time listings. Focus majorly on active and currently hiring positions.
       - Generate jobs from well-known, real companies as well as realistic mid-size and startup companies. Use a good mix.
       - For "contactEmail": Generate a realistic HR/recruiting email address for each company (e.g., careers@company.com, recruiting@company.com, talent@company.com, jobs@company.com, hr@company.com, hiring@company.com). Use the company's actual domain if it's a well-known company. Always try your absolute best to provide a contactEmail for every job. Only set it to null as a very last resort.
       - For "applyLink": Use the company's real careers page URL if it's a well-known company, otherwise generate a realistic one.

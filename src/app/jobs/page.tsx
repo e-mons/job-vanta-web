@@ -82,6 +82,7 @@ function JobsPageContent() {
 
   const searchParams = useSearchParams();
   const resumeIdParam = searchParams.get("resumeId");
+  const triggerSearchParam = searchParams.get("triggerSearch");
 
   useEffect(() => {
     fetchSavedJobs();
@@ -94,16 +95,18 @@ function JobsPageContent() {
       const resume = userResumes.find(r => r.id === resumeIdParam);
       if (resume) {
         setSelectedResume(resume);
-        searchByResume(resume.content.skills || [], {
-          location: filterLocation,
-          radius: filterRadius,
-          isRemote: filterRemote,
-          jobType: filterJobType,
-          experienceLevel: filterExperience
-        });
+        if (triggerSearchParam === "true") {
+          searchByResume(resume.content.skills || [], {
+            location: filterLocation,
+            radius: filterRadius,
+            isRemote: filterRemote,
+            jobType: filterJobType,
+            experienceLevel: filterExperience
+          });
+        }
       }
     }
-  }, [resumeIdParam, userResumes, selectedResume]);
+  }, [resumeIdParam, userResumes, selectedResume, triggerSearchParam]);
 
   const handleResumeSelect = (resume: UserResume) => {
     setSelectedResume(resume);

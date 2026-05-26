@@ -268,8 +268,8 @@ function BuilderEditContent() {
     if (resumeId) {
       await updateOnboardingStatus(resumeId, next);
       if (next === 'completed') {
-        // Onboarding finished — navigate to jobs page with resume context
-        router.push(`/jobs?resumeId=${resumeId}`);
+        // Onboarding finished — navigate to jobs page with resume context and trigger search immediately
+        router.push(`/jobs?resumeId=${resumeId}&triggerSearch=true`);
       }
     }
   };
@@ -316,7 +316,7 @@ function BuilderEditContent() {
 
   const handleGetMatchingJobs = () => {
     if (resumeId) {
-      router.push(`/jobs?resumeId=${resumeId}`);
+      router.push(`/jobs?resumeId=${resumeId}&triggerSearch=true`);
     } else {
       router.push('/jobs');
     }

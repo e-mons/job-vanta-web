@@ -125,6 +125,23 @@ const initialData: ResumeData = {
 
 const normalizeResumeData = (data: any): ResumeData => {
   if (!data) return initialData;
+  
+  const ensureUniqueId = (id: string | undefined, seenSet: Set<string>) => {
+    let finalId = id || Math.random().toString(36).substring(2, 9);
+    if (seenSet.has(finalId)) {
+      finalId = Math.random().toString(36).substring(2, 9) + Math.random().toString(36).substring(2, 5);
+    }
+    seenSet.add(finalId);
+    return finalId;
+  };
+
+  const seenExp = new Set<string>();
+  const seenEdu = new Set<string>();
+  const seenProj = new Set<string>();
+  const seenCert = new Set<string>();
+  const seenLang = new Set<string>();
+  const seenRef = new Set<string>();
+
   return {
     personalInfo: {
       fullName: data.personalInfo?.fullName || "",
@@ -136,41 +153,41 @@ const normalizeResumeData = (data: any): ResumeData => {
       photo: data.personalInfo?.photo || "",
     },
     experience: (data.experience || []).map((exp: any) => ({
-      id: exp.id || Math.random().toString(36).substring(2, 9),
+      id: ensureUniqueId(exp.id, seenExp),
       company: exp.company || "",
       role: exp.role || "",
       dates: exp.dates || "",
       bullets: Array.isArray(exp.bullets) ? exp.bullets : [],
     })),
     education: (data.education || []).map((edu: any) => ({
-      id: edu.id || Math.random().toString(36).substring(2, 9),
+      id: ensureUniqueId(edu.id, seenEdu),
       school: edu.school || "",
       degree: edu.degree || "",
       year: edu.year || "",
     })),
     skills: Array.isArray(data.skills) ? data.skills : [],
     projects: (data.projects || []).map((proj: any) => ({
-      id: proj.id || Math.random().toString(36).substring(2, 9),
+      id: ensureUniqueId(proj.id, seenProj),
       name: proj.name || "",
       description: proj.description || "",
       technologies: Array.isArray(proj.technologies) ? proj.technologies : [],
       link: proj.link || "",
     })),
     certifications: (data.certifications || []).map((cert: any) => ({
-      id: cert.id || Math.random().toString(36).substring(2, 9),
+      id: ensureUniqueId(cert.id, seenCert),
       name: cert.name || "",
       issuer: cert.issuer || "",
       date: cert.date || "",
       link: cert.link || "",
     })),
     languages: (data.languages || []).map((lang: any) => ({
-      id: lang.id || Math.random().toString(36).substring(2, 9),
+      id: ensureUniqueId(lang.id, seenLang),
       name: lang.name || "",
       fluency: lang.fluency || "",
     })),
     interests: Array.isArray(data.interests) ? data.interests : [],
     references: (data.references || []).map((ref: any) => ({
-      id: ref.id || Math.random().toString(36).substring(2, 9),
+      id: ensureUniqueId(ref.id, seenRef),
       name: ref.name || "",
       position: ref.position || "",
       company: ref.company || "",
@@ -369,7 +386,12 @@ export const useResumeStore = create<ResumeState>()(
 
             if (error) throw error;
             
-            set({ currentResumeId: newResume.id, data: normalizedData, isLoading: false });
+            set((state) => ({
+              currentResumeId: newResume.id,
+              data: normalizedData,
+              userResumes: [newResume as UserResume, ...state.userResumes],
+              isLoading: false
+            }));
 
             // Push a real notification
             notifyResumeCreated(title);
@@ -384,6 +406,10 @@ export const useResumeStore = create<ResumeState>()(
         deleteResume: async (id) => {
           const supabase = createClient();
           try {
+            // Delete all child entities first (cover letters linked via resume_id)
+            await supabase.from('cover_letters').delete().eq('resume_id', id);
+
+            // Delete the resume itself (photo is stored inline in content JSON)
             const { error } = await supabase.from('resumes').delete().eq('id', id);
             if (error) throw error;
             set((state) => ({

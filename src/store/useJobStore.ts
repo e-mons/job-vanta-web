@@ -273,8 +273,6 @@ export const useJobStore = create<JobState>()((set, get) => ({
       searchQuery: "",
       locationFilter: "",
       selectedJob: null,
-      savedJobs: [],
-      savedJobIds: new Set<string>(),
       error: null,
     }),
 }));

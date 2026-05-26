@@ -336,8 +336,8 @@ export default function JobDetailsPage() {
                 <div className="space-y-4">
                   <button 
                     onClick={handleMatch}
-                    disabled={isSaving}
-                    className="w-full p-5 rounded-2xl bg-blue-600 text-white font-black text-sm hover:bg-blue-700 transition-all shadow-xl shadow-blue-900/20 active:scale-[0.98] flex items-center justify-center gap-3 group overflow-hidden relative"
+                    disabled={!selectedResume || isSaving}
+                    className="w-full p-5 rounded-2xl bg-blue-600 text-white font-black text-sm hover:bg-blue-700 transition-all shadow-xl shadow-blue-900/20 active:scale-[0.98] flex items-center justify-center gap-3 group overflow-hidden relative disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                     <Sparkles className="w-5 h-5" />
@@ -346,7 +346,8 @@ export default function JobDetailsPage() {
                   
                   <button 
                     onClick={() => setIsEmailModalOpen(true)}
-                    className="w-full p-5 rounded-2xl bg-slate-900 text-white font-black text-sm hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 active:scale-[0.98] flex items-center justify-center gap-3"
+                    disabled={!selectedResume}
+                    className="w-full p-5 rounded-2xl bg-slate-900 text-white font-black text-sm hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
                   >
                     <Mail className="w-4 h-4" />
                     Apply via Email
@@ -364,6 +365,18 @@ export default function JobDetailsPage() {
                     </a>
                   )}
                 </div>
+
+                {!selectedJob.contactEmail && (
+                  <div className="p-5 rounded-2xl bg-amber-50 border border-amber-200 flex items-start gap-3 text-xs font-bold text-amber-700">
+                    <AlertTriangle className="w-5 h-5 shrink-0 text-amber-500" />
+                    <div className="space-y-1">
+                      <p className="text-amber-800 font-black">No Verified Application Email</p>
+                      <p className="leading-relaxed font-semibold">
+                        No direct recruiting email was verified for this role. We have configured a fallback email ({selectedJob.company ? `careers@${selectedJob.company.toLowerCase().replace(/[^a-z0-9]/g, '')}.com` : "hiring@company.com"}), but you should verify it before applying.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-4 pt-4">
                   <div className="flex items-center gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-100">

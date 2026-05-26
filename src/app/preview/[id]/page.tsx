@@ -6,14 +6,17 @@ export default async function PreviewPage({
   params,
   searchParams,
 }: { 
-  params: { id: string };
-  searchParams: { templateId?: string };
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ templateId?: string }>;
 }) {
+  const resolvedParams = await params;
+  const resolvedSearchParams = await searchParams;
+  
   const supabase = createAdminClient();
   const { data: resume, error } = await supabase
     .from('resumes')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', resolvedParams.id)
     .single();
 
   if (error || !resume) {
@@ -24,15 +27,15 @@ export default async function PreviewPage({
     );
   }
 
-  const templateId = searchParams.templateId || resume.template_id || 'modern';
+  const templateId = resolvedSearchParams.templateId || resume.template_id || 'modern';
 
   return (
-    <div className="min-h-screen bg-transparent w-full flex justify-center p-0 m-0 overflow-hidden">
+    <div className="min-h-screen bg-transparent w-full p-0 m-0 overflow-y-auto overflow-x-hidden">
       <style dangerouslySetInnerHTML={{__html: `
-        body { background: transparent !important; margin: 0; padding: 0; }
+        body { background: transparent !important; margin: 0; padding: 0; overflow-y: auto; overflow-x: hidden; }
         ::-webkit-scrollbar { display: none; }
       `}} />
-      <HTMLPreview data={resume.content} templateId={templateId} scale={1} />
+      <HTMLPreview data={resume.content} templateId={templateId} autoScale={true} />
     </div>
   );
 }
