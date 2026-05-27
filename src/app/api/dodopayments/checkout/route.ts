@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    const { productId } = await req.json();
+    const { productId, redirectUrl } = await req.json();
 
     if (!productId) {
       return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
@@ -18,6 +18,11 @@ export async function POST(req: Request) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const return_url = redirectUrl 
+      ? `${siteUrl}/payment-callback?redirect_to_mobile=${encodeURIComponent(redirectUrl)}`
+      : `${siteUrl}/dashboard`;
 
     // Create Dodo Payments Checkout Session
     const session = await dodo.checkoutSessions.create({
@@ -32,7 +37,7 @@ export async function POST(req: Request) {
           email: user.email,
         }
       } : {}),
-      return_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/dashboard`,
+      return_url,
       metadata: {
         userId: user.id,
       },

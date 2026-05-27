@@ -14,16 +14,20 @@ interface GeminiOptions {
   responseMimeType?: string;
 }
 
+// Caching the last working model & version globally in this module to skip fallback scanning on future calls
+let cachedModel: { name: string; apiVersion: string } | null = null;
+
 export async function callGeminiWithFallback(
   prompt: string | (string | Part)[],
   options: GeminiOptions = {}
 ) {
   const {
     modelNames = [
-      "gemini-2.0-flash-lite",
+      "gemini-3.1-flash-lite",
+      "gemini-3.5-flash",
       "gemini-2.5-flash-lite",
+      "gemini-2.0-flash-lite",
       "gemini-2.0-flash",
-      "gemini-2.5-flash",
       "gemini-1.5-flash"
     ],
     maxRetries = 1,
@@ -32,35 +36,55 @@ export async function callGeminiWithFallback(
 
   let lastError: any;
 
-  // Perform discovery once to see what's actually available
-  try {
-    const listRes = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`);
-    if (listRes.ok) {
-      const listData = await listRes.json();
-      const availableModels = listData.models?.map((m: any) => m.name.replace('models/', '')) || [];
-      console.log(`[Gemini] DISCOVERY (v1): Available models: ${availableModels.join(', ')}`);
-    } else {
-      // Try v1beta if v1 fails
-      const listResBeta = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-      if (listResBeta.ok) {
-        const listData = await listResBeta.json();
-        const availableModels = listData.models?.map((m: any) => m.name.replace('models/', '')) || [];
-        console.log(`[Gemini] DISCOVERY (v1beta): Available models: ${availableModels.join(', ')}`);
-      } else {
-        const errText = await listResBeta.text();
-        console.warn(`[Gemini] Discovery failed. Key might be restricted or API not enabled. Status: ${listResBeta.status}`);
+  // 1. If we have a cached working model, try it first to respond instantly
+  if (cachedModel) {
+    let attempts = 0;
+    while (attempts <= maxRetries) {
+      try {
+        console.log(`[Gemini] Trying cached model ${cachedModel.name} (${cachedModel.apiVersion})...`);
+        const model = genAI.getGenerativeModel(
+          { 
+            model: cachedModel.name,
+            ...(responseMimeType ? { generationConfig: { responseMimeType } } : {})
+          },
+          { apiVersion: cachedModel.apiVersion }
+        );
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+        
+        if (text) {
+          console.log(`[Gemini] Cache Hit Success: ${cachedModel.name} (${cachedModel.apiVersion})`);
+          return text;
+        }
+      } catch (err: any) {
+        attempts++;
+        lastError = err;
+        console.warn(`[Gemini] Cached model attempt ${attempts} failed: ${err.message}`);
+        
+        if (err.status === 429) {
+          if (attempts <= maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            continue;
+          }
+        }
+        
+        console.log(`[Gemini] Invalidating cached model: ${cachedModel.name}`);
+        cachedModel = null;
+        break;
       }
     }
-  } catch (e) {
-    console.warn("[Gemini] Discovery network error.");
   }
 
+  // 2. Fallback scan loop if cache is empty or failed
   for (const modelName of modelNames) {
-    for (const apiVersion of ["v1", "v1beta"]) {
+    // Try v1beta first as newer/preview models are there, then try stable v1
+    for (const apiVersion of ["v1beta", "v1"]) {
       let attempts = 0;
       while (attempts <= maxRetries) {
         try {
-          console.log(`[Gemini] Trying ${modelName} (${apiVersion})...`);
+          console.log(`[Gemini] Scanning model ${modelName} (${apiVersion})...`);
           
           const model = genAI.getGenerativeModel(
             { 
@@ -76,31 +100,28 @@ export async function callGeminiWithFallback(
           
           if (text) {
             console.log(`[Gemini] Success: ${modelName} (${apiVersion})`);
+            cachedModel = { name: modelName, apiVersion };
             return text;
           }
         } catch (err: any) {
           attempts++;
           lastError = err;
           
-          console.warn(`[Gemini] Attempt ${attempts} failed for ${modelName} (${apiVersion}): Status ${err.status} - ${err.message}`);
+          console.warn(`[Gemini] Scan attempt ${attempts} failed for ${modelName} (${apiVersion}): Status ${err.status} - ${err.message}`);
 
-          // If quota exhausted, wait and retry once, then move to next model
           if (err.status === 429) {
             if (attempts <= maxRetries) {
-              console.log(`[Gemini] Quota hit for ${modelName}. Waiting 3s before retry...`);
-              await new Promise(resolve => setTimeout(resolve, 3000));
+              console.log(`[Gemini] Quota hit for ${modelName}. Waiting 2s before retry...`);
+              await new Promise(resolve => setTimeout(resolve, 2000));
               continue;
             }
-            console.warn(`[Gemini] Quota exhausted for ${modelName}. Trying next model...`);
             break;
           }
 
-          // For 404, the model simply doesn't exist on this API version, try the next version/model immediately
           if (err.status === 404) {
             break; 
           }
 
-          // For other errors (network, etc.), retry if attempts left
           if (attempts <= maxRetries) {
             const delay = Math.pow(2, attempts) * 1000;
             await new Promise(resolve => setTimeout(resolve, delay));
@@ -113,7 +134,6 @@ export async function callGeminiWithFallback(
     }
   }
 
-  // If we get here, all models and retries failed
   const errorMsg = lastError?.message || "All Gemini models failed";
   console.error(`[Gemini] Fatal error: ${errorMsg}`);
   
