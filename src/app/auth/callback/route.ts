@@ -8,19 +8,22 @@ export async function GET(request: Request) {
   const next = searchParams.get('next') ?? '/'
   const redirectToMobile = searchParams.get('redirect_to_mobile')
 
+  if (redirectToMobile) {
+    const newUrl = new URL(request.url)
+    newUrl.searchParams.delete('redirect_to_mobile')
+    const searchString = newUrl.searchParams.toString()
+    const separator = redirectToMobile.includes('?') ? '&' : '?'
+    const mobileLink = `${redirectToMobile}${searchString ? separator + searchString : ''}`
+    
+    console.log(`[Auth Callback] Redirecting to mobile deep link: ${mobileLink}`)
+    return NextResponse.redirect(mobileLink)
+  }
+
   if (code) {
     const supabase = await createClient()
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     
     if (!error && data?.session) {
-      if (redirectToMobile) {
-        const tokenHash = `access_token=${data.session.access_token}&refresh_token=${data.session.refresh_token}`
-        const separator = redirectToMobile.includes('#') ? '&' : '#'
-        const mobileLink = `${redirectToMobile}${separator}${tokenHash}`
-        
-        console.log(`[Auth Callback] Redirecting to mobile deep link: ${mobileLink}`)
-        return NextResponse.redirect(mobileLink)
-      }
       return NextResponse.redirect(`${origin}${next}`)
     }
   }
