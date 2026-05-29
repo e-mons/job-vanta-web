@@ -122,7 +122,7 @@ export default function Navbar({ user: initialUser, isDark = false }: NavbarProp
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             {user ? (
               <div className="relative" ref={dropdownRef}>
                 <button 
@@ -230,7 +230,7 @@ export default function Navbar({ user: initialUser, isDark = false }: NavbarProp
                 </Link>
                 <Link 
                   href="/signup" 
-                  className={`px-7 py-2.5 rounded-full text-sm font-black transition-all transform active:scale-95 ${
+                  className={`hidden sm:inline-flex px-7 py-2.5 rounded-full text-sm font-black transition-all transform active:scale-95 ${
                     isScrolled 
                       ? 'bg-blue-600 text-white shadow-glow-blue hover:bg-blue-700' 
                       : 'bg-white text-blue-600 hover:bg-blue-50 shadow-xl shadow-white/10'
