@@ -41,7 +41,7 @@ export default function Hero() {
     <section className="relative min-h-[110vh] flex flex-col items-center justify-start overflow-hidden bg-dark-hero pt-32 pb-20">
       {/* Ribbed Background Overlay */}
       <div className="absolute inset-0 ribbed-background opacity-20 pointer-events-none" />
-      
+
       {/* Animated Glows */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-[500px] bg-blue-600/20 blur-[120px] rounded-full pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/10 blur-[100px] rounded-full pointer-events-none" />
@@ -69,7 +69,7 @@ export default function Hero() {
         >
           Land your dream <br />
           <span className="text-transparent bg-clip-text bg-gradient-to-b from-blue-400 to-blue-600">
-            career with AI precision.
+            career 10x faster.
           </span>
         </motion.h1>
 
@@ -90,8 +90,8 @@ export default function Hero() {
           transition={{ duration: 0.8, delay: 0.3 }}
           className="mb-24"
         >
-          <Link 
-            href="/signup" 
+          <Link
+            href="/signup"
             className="group relative inline-flex items-center gap-3 px-10 py-5 rounded-full bg-white text-blue-600 font-black text-lg transition-all hover:scale-105 hover:shadow-[0_0_40px_rgba(255,255,255,0.3)] active:scale-95"
           >
             Get Started for Free
@@ -110,13 +110,13 @@ export default function Hero() {
           >
             {/* Notch */}
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-slate-800 rounded-b-2xl z-20" />
-            
+
             {/* App Screen Content */}
             <div className="relative w-full h-full">
-              <Image 
-                src="/assets/jobvanta_app_preview.png" 
-                alt="JobVanta AI Dashboard Preview" 
-                fill 
+              <Image
+                src="/assets/jobvanta_app_preview.png"
+                alt="JobVanta AI Dashboard Preview"
+                fill
                 sizes="(max-width: 768px) 100vw, 33vw"
                 className="object-cover"
               />
@@ -148,20 +148,20 @@ export default function Hero() {
 
           {/* Connection Lines (Optional SVG Decor) */}
           <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-20 hidden lg:block" viewBox="0 0 1000 600">
-             <motion.path 
-               initial={{ pathLength: 0 }}
-               animate={{ pathLength: 1 }}
-               transition={{ duration: 2, delay: 1 }}
-               d="M200 150 Q 350 150 480 300" 
-               stroke="white" strokeWidth="1" fill="none" strokeDasharray="5 5" 
-             />
-             <motion.path 
-               initial={{ pathLength: 0 }}
-               animate={{ pathLength: 1 }}
-               transition={{ duration: 2, delay: 1.2 }}
-               d="M800 200 Q 650 200 520 350" 
-               stroke="white" strokeWidth="1" fill="none" strokeDasharray="5 5" 
-             />
+            <motion.path
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ duration: 2, delay: 1 }}
+              d="M200 150 Q 350 150 480 300"
+              stroke="white" strokeWidth="1" fill="none" strokeDasharray="5 5"
+            />
+            <motion.path
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ duration: 2, delay: 1.2 }}
+              d="M800 200 Q 650 200 520 350"
+              stroke="white" strokeWidth="1" fill="none" strokeDasharray="5 5"
+            />
           </svg>
         </div>
       </div>
