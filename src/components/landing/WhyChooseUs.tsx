@@ -22,7 +22,7 @@ const tabs = [
     title: "Unmatched Skill Matching",
     desc: "Our deep-learning algorithms analyze your skill set and match you with roles that perfectly align with your career goals.",
     featureTitle: "Smart Match Engine",
-    featureDesc: "Identify high-impact roles with 95% alignment accuracy instantly.",
+    featureDesc: "Identify high-impact roles based on deep semantic skill overlap, experience matching, and career goals.",
     mainImage: "/assets/professional_job_seeker_blue.png"
   },
   {
@@ -188,8 +188,8 @@ export default function WhyChooseUs() {
                     <TrendingUp className="w-6 h-6 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Growth</p>
-                    <p className="text-slate-900 font-bold">+24% Salary Increase</p>
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Insights</p>
+                    <p className="text-slate-900 font-bold">Market Value Alignment</p>
                   </div>
                 </div>
 

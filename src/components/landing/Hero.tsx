@@ -8,29 +8,29 @@ import { ChevronRight, Sparkles, TrendingUp, Search, ShieldCheck, Star } from 'l
 const floatingCards = [
   {
     icon: <ShieldCheck className="w-5 h-5 text-blue-400" />,
-    title: "ATS Optimized",
-    value: "High Score",
+    title: "ATS Scorer",
+    value: "Score Verified",
     pos: "top-[15%] left-[5%] lg:left-[15%]",
     delay: 0.2
   },
   {
     icon: <Search className="w-5 h-5 text-blue-400" />,
-    title: "New Roles",
-    value: "Updated Daily",
+    title: "Verified Jobs",
+    value: "Active Only",
     pos: "top-[25%] right-[5%] lg:right-[15%]",
     delay: 0.4
   },
   {
     icon: <TrendingUp className="w-5 h-5 text-blue-400" />,
-    title: "Interview Rate",
-    value: "+45% Boost",
+    title: "Resume Tailoring",
+    value: "Keyword Optimised",
     pos: "bottom-[25%] left-[2%] lg:left-[10%]",
     delay: 0.6
   },
   {
     icon: <Star className="w-5 h-5 text-blue-400" />,
-    title: "Success Rate",
-    value: "Offer Received 🎉",
+    title: "AI Career Coach",
+    value: "24/7 Support ⚡",
     pos: "bottom-[15%] right-[2%] lg:right-[10%]",
     delay: 0.8
   }
@@ -69,7 +69,7 @@ export default function Hero() {
         >
           Land your dream <br />
           <span className="text-transparent bg-clip-text bg-gradient-to-b from-blue-400 to-blue-600">
-            career 10x faster.
+            career with AI precision.
           </span>
         </motion.h1>
 
@@ -80,7 +80,7 @@ export default function Hero() {
           transition={{ duration: 0.8, delay: 0.2 }}
           className="text-lg md:text-xl text-white/60 max-w-2xl mx-auto mb-12 leading-relaxed font-medium"
         >
-          The AI-first platform for modern job seekers. Build ATS-proof resumes, discover hidden opportunities, and automate your application workflow.
+          The AI-first platform for modern job seekers. Build ATS-optimized resumes, discover verified opportunities, and automate your application workflow.
         </motion.p>
 
         {/* CTA Button */}

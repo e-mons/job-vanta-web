@@ -118,7 +118,7 @@ export default function Templates() {
   return (
     <section id="templates" className="py-24 bg-white relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-8 sm:px-12 lg:px-16 relative">
-        
+
         {/* Header */}
         <div className="flex flex-col md:flex-row items-end justify-between gap-8 mb-16">
           <div className="max-w-2xl">
@@ -131,15 +131,15 @@ export default function Templates() {
               <Layout className="w-3.5 h-3.5" />
               <span className="text-[10px] font-black uppercase tracking-widest">Resume Templates</span>
             </motion.div>
-            
-            <motion.h2 
+
+            <motion.h2
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               className="text-4xl md:text-5xl font-black tracking-tight text-slate-900 leading-[1.1]"
             >
-              Pick a Template and <br />
-              <span className="text-blue-600">Create Your Resume</span>
+              Pick a Resume Template <br />
+              <span className="text-blue-600">and Create Your Resume</span>
             </motion.h2>
           </div>
 
@@ -147,22 +147,20 @@ export default function Templates() {
             <button
               onClick={() => scroll('left')}
               disabled={!canScrollLeft}
-              className={`p-4 rounded-full border transition-all ${
-                canScrollLeft 
-                ? 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-blue-600 hover:text-blue-600 shadow-sm' 
+              className={`p-4 rounded-full border transition-all ${canScrollLeft
+                ? 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-blue-600 hover:text-blue-600 shadow-sm'
                 : 'border-slate-100 text-slate-300 cursor-not-allowed'
-              }`}
+                }`}
             >
               <ChevronLeft className="w-6 h-6" />
             </button>
             <button
               onClick={() => scroll('right')}
               disabled={!canScrollRight}
-              className={`p-4 rounded-full border transition-all ${
-                canScrollRight 
-                ? 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-blue-600 hover:text-blue-600 shadow-sm' 
+              className={`p-4 rounded-full border transition-all ${canScrollRight
+                ? 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-blue-600 hover:text-blue-600 shadow-sm'
                 : 'border-slate-100 text-slate-300 cursor-not-allowed'
-              }`}
+                }`}
             >
               <ChevronRight className="w-6 h-6" />
             </button>
@@ -170,7 +168,7 @@ export default function Templates() {
         </div>
 
         {/* Templates Slider */}
-        <div 
+        <div
           ref={scrollRef}
           onScroll={handleScroll}
           className="flex gap-8 overflow-x-auto pb-12 premium-scrollbar snap-x snap-mandatory"
@@ -185,13 +183,13 @@ export default function Templates() {
               className="min-w-[320px] md:min-w-[400px] snap-start group"
             >
               <div className="relative aspect-[3/4] rounded-[2.5rem] overflow-hidden bg-slate-50 border border-slate-100 shadow-xl shadow-slate-200/50 transition-all duration-500 group-hover:-translate-y-4 group-hover:shadow-2xl group-hover:shadow-blue-500/10">
-                <Image 
+                <Image
                   src={template.image}
                   alt={template.name}
                   fill
                   className="object-cover transition-transform duration-700 group-hover:scale-110"
                 />
-                
+
                 {/* Overlay Info */}
                 <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-transparent translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
                   <div className="flex items-center gap-2 text-blue-400 text-xs font-bold uppercase tracking-widest mb-2">
@@ -199,7 +197,7 @@ export default function Templates() {
                     Recruiter Approved
                   </div>
                   <h3 className="text-xl font-bold text-white mb-4">{template.name}</h3>
-                  <Link 
+                  <Link
                     href={`/builder/options?templateId=${template.id}`}
                     onClick={() => setTemplateId(template.id)}
                     className="block w-full py-4 bg-blue-600 hover:bg-blue-500 text-white text-center font-bold rounded-2xl transition-colors shadow-lg shadow-blue-600/30"

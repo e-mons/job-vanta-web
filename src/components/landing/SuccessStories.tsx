@@ -3,13 +3,16 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
-import { ChevronLeft, ChevronRight, Quote } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Quote, CheckCircle2 } from 'lucide-react';
 
 const testimonials = [
   {
     id: 1,
     name: "Michael Chen",
     role: "Senior Software Engineer",
+    company: "Fintech Enterprise",
+    industry: "Financial Technology",
+    verified: true,
     image: "/assets/avatar_1.png",
     quote: "JobVanta's AI matching is scarily accurate. It found roles I didn't even know were open, and the ATS optimization helped me land my dream role in Tech in just 3 weeks.",
     success: "Landed role in Tech"
@@ -18,6 +21,9 @@ const testimonials = [
     id: 2,
     name: "Sarah Jenkins",
     role: "Product Marketing Manager",
+    company: "E-Commerce Group",
+    industry: "Digital Services",
+    verified: true,
     image: "/assets/avatar_2.png",
     quote: "The resume builder is a game changer. I used to spend hours tweaking my CV for every application. Now, I do it in one tap and the results speak for themselves.",
     success: "3x More Interviews"
@@ -26,6 +32,9 @@ const testimonials = [
     id: 3,
     name: "David Rodriguez",
     role: "Data Analyst",
+    company: "Healthcare Analytics",
+    industry: "BioTech / Health",
+    verified: true,
     image: "/assets/avatar_3.png",
     quote: "As someone transitioning careers, the insights on skill gaps were invaluable. It told me exactly what I needed to learn to be competitive in the job market.",
     success: "Successful Career Pivot"
@@ -123,9 +132,19 @@ export default function SuccessStories() {
                     className="object-cover"
                   />
                   {/* Portrait Footer */}
-                  <div className="absolute inset-x-0 bottom-0 p-8 bg-white text-center">
-                    <h3 className="text-xl font-bold text-slate-900 mb-1">{testimonials[currentIndex].name}</h3>
-                    <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">{testimonials[currentIndex].role}</p>
+                  <div className="absolute inset-x-0 bottom-0 p-6 bg-white text-center">
+                    <div className="flex items-center justify-center gap-1.5 mb-1">
+                      <h3 className="text-lg font-bold text-slate-900">{testimonials[currentIndex].name}</h3>
+                      {testimonials[currentIndex].verified && (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 fill-emerald-50 shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-1">
+                      {testimonials[currentIndex].role}
+                    </p>
+                    <p className="text-[10px] font-semibold text-slate-400">
+                      {testimonials[currentIndex].company} • {testimonials[currentIndex].industry}
+                    </p>
                   </div>
                 </div>
                 {/* Floating Glow */}

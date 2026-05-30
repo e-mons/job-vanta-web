@@ -73,7 +73,7 @@ export default function Navbar({ user: initialUser, isDark = false }: NavbarProp
 
   const navLinks = [
     { name: 'Features', href: '/#features' },
-    { name: 'Templates', href: '/#templates' },
+    { name: 'Resume Templates', href: '/#templates' },
     { name: 'Testimonials', href: '/#testimonials' },
   ];
 
@@ -85,16 +85,14 @@ export default function Navbar({ user: initialUser, isDark = false }: NavbarProp
   ];
 
   return (
-    <nav 
-      className={`fixed top-0 w-full z-50 transition-all duration-500 ${
-        isScrolled ? 'py-4' : 'py-6'
-      }`}
+    <nav
+      className={`fixed top-0 w-full z-50 transition-all duration-500 ${isScrolled ? 'py-4' : 'py-6'
+        }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-16">
-        <div 
-          className={`relative flex items-center justify-between px-8 py-3 rounded-full transition-all duration-500 ${
-            isScrolled ? 'glass shadow-premium' : 'bg-transparent'
-          }`}
+        <div
+          className={`relative flex items-center justify-between px-8 py-3 rounded-full transition-all duration-500 ${isScrolled ? 'glass shadow-premium' : 'bg-transparent'
+            }`}
         >
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 group">
@@ -107,14 +105,13 @@ export default function Navbar({ user: initialUser, isDark = false }: NavbarProp
           {/* Desktop Nav - Centered */}
           <div className="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
             {navLinks.map((link) => (
-              <Link 
-                key={link.name} 
+              <Link
+                key={link.name}
                 href={link.href}
-                className={`px-5 py-2 text-sm font-bold transition-all rounded-full ${
-                  isScrolled 
-                    ? 'text-slate-500 hover:text-blue-600 hover:bg-blue-50' 
+                className={`px-5 py-2 text-sm font-bold transition-all rounded-full ${isScrolled
+                    ? 'text-slate-500 hover:text-blue-600 hover:bg-blue-50'
                     : 'text-white/70 hover:text-white hover:bg-white/10'
-                }`}
+                  }`}
               >
                 {link.name}
               </Link>
@@ -125,13 +122,12 @@ export default function Navbar({ user: initialUser, isDark = false }: NavbarProp
           <div className="flex items-center gap-2 sm:gap-4">
             {user ? (
               <div className="relative" ref={dropdownRef}>
-                <button 
+                <button
                   onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-                  className={`flex items-center gap-3 pl-2 pr-4 py-1.5 rounded-full transition-all border ${
-                    isScrolled 
-                      ? 'bg-slate-50 border-slate-100 hover:border-blue-200' 
+                  className={`flex items-center gap-3 pl-2 pr-4 py-1.5 rounded-full transition-all border ${isScrolled
+                      ? 'bg-slate-50 border-slate-100 hover:border-blue-200'
                       : 'bg-white/10 border-white/10 hover:bg-white/20'
-                  }`}
+                    }`}
                 >
                   <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shadow-lg shadow-blue-600/20">
                     {user.email?.[0].toUpperCase()}
@@ -164,11 +160,10 @@ export default function Navbar({ user: initialUser, isDark = false }: NavbarProp
                             <div className="flex-1 min-w-0">
                               <p className="text-base font-black text-slate-900 truncate tracking-tight leading-none mb-1">{user.email?.split('@')[0]}</p>
                               <p className="text-[11px] font-bold text-slate-400 truncate uppercase tracking-widest">{user.email}</p>
-                              <div className={`mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-lg ${
-                                subStatus === 'active' || subStatus === 'trialing' 
-                                  ? 'bg-blue-600 text-white shadow-blue-600/20' 
+                              <div className={`mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-lg ${subStatus === 'active' || subStatus === 'trialing'
+                                  ? 'bg-blue-600 text-white shadow-blue-600/20'
                                   : 'bg-slate-100 text-slate-500 shadow-slate-200/20'
-                              }`}>
+                                }`}>
                                 <Star className={`w-3 h-3 ${subStatus === 'active' || subStatus === 'trialing' ? 'fill-white' : 'fill-slate-400'}`} />
                                 {subStatus === 'active' || subStatus === 'trialing' ? 'Premium' : 'Free Plan'}
                               </div>
@@ -220,21 +215,19 @@ export default function Navbar({ user: initialUser, isDark = false }: NavbarProp
               </div>
             ) : (
               <>
-                <Link 
-                  href="/login" 
-                  className={`hidden sm:block px-5 py-2 text-sm font-bold transition-colors ${
-                    isScrolled ? 'text-slate-600 hover:text-slate-900' : 'text-white/80 hover:text-white'
-                  }`}
+                <Link
+                  href="/login"
+                  className={`hidden md:block px-5 py-2 text-sm font-bold transition-colors ${isScrolled ? 'text-slate-600 hover:text-slate-900' : 'text-white/80 hover:text-white'
+                    }`}
                 >
                   Sign In
                 </Link>
-                <Link 
-                  href="/signup" 
-                  className={`hidden sm:inline-flex px-7 py-2.5 rounded-full text-sm font-black transition-all transform active:scale-95 ${
-                    isScrolled 
-                      ? 'bg-blue-600 text-white shadow-glow-blue hover:bg-blue-700' 
+                <Link
+                  href="/signup"
+                  className={`hidden md:inline-flex px-7 py-2.5 rounded-full text-sm font-black transition-all transform active:scale-95 ${isScrolled
+                      ? 'bg-blue-600 text-white shadow-glow-blue hover:bg-blue-700'
                       : 'bg-white text-blue-600 hover:bg-blue-50 shadow-xl shadow-white/10'
-                  }`}
+                    }`}
                 >
                   Get Started
                 </Link>
@@ -242,7 +235,7 @@ export default function Navbar({ user: initialUser, isDark = false }: NavbarProp
             )}
 
             {/* Mobile Toggle */}
-            <button 
+            <button
               className={`md:hidden p-2 transition-colors ${isScrolled ? 'text-slate-900' : 'text-white'}`}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
@@ -263,8 +256,8 @@ export default function Navbar({ user: initialUser, isDark = false }: NavbarProp
           >
             <div className="flex flex-col gap-4">
               {(user ? [...navLinks, ...authLinks] : navLinks).map((link) => (
-                <Link 
-                  key={link.name} 
+                <Link
+                  key={link.name}
                   href={link.href}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="text-lg font-bold text-slate-900 flex items-center justify-between group"
@@ -288,15 +281,15 @@ export default function Navbar({ user: initialUser, isDark = false }: NavbarProp
               )}
               {!user && (
                 <div className="grid grid-cols-2 gap-4 mt-4">
-                  <Link 
-                    href="/login" 
+                  <Link
+                    href="/login"
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="py-3 rounded-2xl border border-slate-200 text-center font-bold text-slate-600"
                   >
                     Login
                   </Link>
-                  <Link 
-                    href="/signup" 
+                  <Link
+                    href="/signup"
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="py-3 rounded-2xl bg-blue-600 text-white text-center font-bold shadow-lg shadow-blue-600/20"
                   >

@@ -4,12 +4,16 @@ import Navbar from '@/components/landing/Navbar';
 import Hero from '@/components/landing/Hero';
 import TrustedCompanies from '@/components/landing/TrustedCompanies';
 import HowItWorks from '@/components/landing/HowItWorks';
+import ProductDemonstration from '@/components/landing/ProductDemonstration';
 import AIFeatures from '@/components/landing/AIFeatures';
 import Templates from '@/components/landing/Templates';
 import WhyChooseUs from '@/components/landing/WhyChooseUs';
+import CompetitorComparison from '@/components/landing/CompetitorComparison';
+import TrustAndSecurity from '@/components/landing/TrustAndSecurity';
 import UserResumes from '@/components/landing/UserResumes';
 import SavedJobs from '@/components/landing/SavedJobs';
 import SuccessStories from '@/components/landing/SuccessStories';
+import CompanyAndTeam from '@/components/landing/CompanyAndTeam';
 import MobilePromo from '@/components/landing/MobilePromo';
 import FAQ from '@/components/landing/FAQ';
 import CTA from '@/components/landing/CTA';
@@ -26,9 +30,12 @@ export default async function Home() {
       <Hero />
       <TrustedCompanies />
       <HowItWorks />
+      <ProductDemonstration />
       <AIFeatures />
       <Templates />
       <WhyChooseUs />
+      <CompetitorComparison />
+      <TrustAndSecurity />
       
       {/* Dashboard Section for Authenticated Users */}
       {user && (
@@ -55,6 +62,7 @@ export default async function Home() {
       
 
       <SuccessStories />
+      <CompanyAndTeam />
       <MobilePromo />
       <FAQ />
       <CTA />
