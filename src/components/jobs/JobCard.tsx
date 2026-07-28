@@ -1,6 +1,6 @@
 "use client";
 
-import { Heart, ExternalLink, MapPin, Building2, Clock, Zap, Lock, ArrowRight, Loader2 } from "lucide-react";
+import { Heart, ExternalLink, MapPin, Building2, Clock, Zap, Lock, ArrowRight, Loader2, Send } from "lucide-react";
 import { Job, useJobStore } from "@/store/useJobStore";
 import { useResumeStore } from "@/store/useResumeStore";
 import { useSubscriptionStore } from "@/store/useSubscription";
@@ -40,9 +40,10 @@ interface JobCardProps {
   job: Job;
   index: number;
   onApply: () => void;
+  onApplyNow?: () => void;
 }
 
-export default function JobCard({ job, index, onApply }: JobCardProps) {
+export default function JobCard({ job, index, onApply, onApplyNow }: JobCardProps) {
   const { saveJob, unsaveJob, savedJobs, savedJobIds } = useJobStore();
   const { isPremium } = useSubscriptionStore();
   const resumeSkills = useResumeStore((s) => s.data.skills);
@@ -173,25 +174,40 @@ export default function JobCard({ job, index, onApply }: JobCardProps) {
             </div>
           </div>
 
-          {/* Premium Save / Unsave Job Button */}
-          <div className="mt-6 relative z-20">
+          {/* Action Buttons: Save Job & Apply Now aligned side-by-side */}
+          <div className="mt-6 grid grid-cols-2 gap-3 relative z-20">
             <button
               onClick={handleToggleSave}
               disabled={isTogglingSave}
-              className={`group/btn w-full py-3 rounded-2xl font-black text-[11px] uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 border shadow-sm active:scale-[0.98] ${
+              className={`group/btn w-full py-3 px-3 rounded-2xl font-black text-[11px] uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 border shadow-sm active:scale-[0.98] ${
                 isSaved
                   ? "bg-rose-500 border-rose-500 text-white hover:bg-rose-600 hover:border-rose-600 hover:shadow-lg hover:shadow-rose-600/20"
-                  : "bg-slate-50/80 border-slate-200/80 text-slate-700 hover:bg-blue-600 hover:text-white hover:border-blue-600 hover:shadow-lg hover:shadow-blue-600/10"
+                  : "bg-slate-50/80 border-slate-200/80 text-slate-700 hover:bg-slate-100 hover:border-slate-300"
               } ${isTogglingSave ? "opacity-70 cursor-not-allowed" : ""}`}
             >
               {isTogglingSave ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <Heart className={`w-3.5 h-3.5 ${isSaved ? "fill-current text-white" : "text-slate-400 group-hover/btn:text-white transition-colors"}`} />
+                <Heart className={`w-3.5 h-3.5 ${isSaved ? "fill-current text-white" : "text-slate-400 group-hover/btn:text-rose-500 transition-colors"}`} />
               )}
-              {isTogglingSave 
+              <span className="truncate">{isTogglingSave 
                 ? (isSaved ? "Unsaving..." : "Saving...") 
-                : (isSaved ? "Unsave Job" : "Save Job")}
+                : (isSaved ? "Saved" : "Save Job")}</span>
+            </button>
+
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onApplyNow) {
+                  onApplyNow();
+                } else {
+                  onApply();
+                }
+              }}
+              className="group/apply w-full py-3 px-3 rounded-2xl font-black text-[11px] uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 border border-blue-600 text-white hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg hover:shadow-blue-600/25 active:scale-[0.98]"
+            >
+              <Send className="w-3.5 h-3.5 text-blue-200 group-hover/apply:translate-x-0.5 group-hover/apply:-translate-y-0.5 transition-transform" />
+              <span>Apply Now</span>
             </button>
           </div>
 

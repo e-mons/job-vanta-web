@@ -406,18 +406,25 @@ export const useResumeStore = create<ResumeState>()(
         deleteResume: async (id) => {
           const supabase = createClient();
           try {
-            // Delete all child entities first (cover letters linked via resume_id)
-            await supabase.from('cover_letters').delete().eq('resume_id', id);
+            // The database handles all cascades automatically:
+            //   - cover_letters.resume_id ON DELETE CASCADE
+            //   - job_applications.resume_id ON DELETE CASCADE
+            // No need to manually delete child records.
+            const { error } = await supabase
+              .from('resumes')
+              .delete()
+              .eq('id', id);
 
-            // Delete the resume itself (photo is stored inline in content JSON)
-            const { error } = await supabase.from('resumes').delete().eq('id', id);
             if (error) throw error;
+
             set((state) => ({
               userResumes: state.userResumes.filter(r => r.id !== id),
-              currentResumeId: state.currentResumeId === id ? null : state.currentResumeId
+              currentResumeId: state.currentResumeId === id ? null : state.currentResumeId,
             }));
           } catch (err: any) {
             console.error('Failed to delete resume:', err.message);
+            // Re-throw so the caller (UI) can show appropriate user feedback
+            throw err;
           }
         },
 

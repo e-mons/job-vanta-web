@@ -8,6 +8,7 @@ import { createClient } from '@/utils/supabase/client';
 import { useResumeStore } from '@/store/useResumeStore';
 import { useJobStore } from '@/store/useJobStore';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
+import { toast } from 'sonner';
 
 export default function CoverLettersPage() {
   const [coverLetters, setCoverLetters] = useState<any[]>([]);
@@ -35,11 +36,17 @@ export default function CoverLettersPage() {
   };
 
   const handleSignOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    resetJobs();
-    resetResumes();
-    router.push("/");
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      resetJobs();
+      resetResumes();
+      toast.success("Signed out successfully");
+      window.location.href = "/";
+    } catch (err) {
+      console.error("Sign out error:", err);
+      window.location.href = "/";
+    }
   };
 
   return (

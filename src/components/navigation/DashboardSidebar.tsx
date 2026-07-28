@@ -19,6 +19,7 @@ import { useJobStore } from "@/store/useJobStore";
 import { useResumeStore } from "@/store/useResumeStore";
 import { useSubscriptionStore } from "@/store/useSubscription";
 import { useNotificationStore } from "@/store/useNotificationStore";
+import { toast } from "sonner";
 
 export default function DashboardSidebar() {
   const pathname = usePathname();
@@ -29,11 +30,17 @@ export default function DashboardSidebar() {
   const unreadCount = useNotificationStore((s) => s.unreadCount);
 
   const handleSignOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    resetJobs();
-    resetResumes();
-    router.push("/");
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      resetJobs();
+      resetResumes();
+      toast.success("Signed out successfully");
+      window.location.href = "/";
+    } catch (err) {
+      console.error("Sign out error:", err);
+      window.location.href = "/";
+    }
   };
 
   const menuItems = [

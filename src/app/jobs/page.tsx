@@ -108,14 +108,42 @@ function JobsPageContent() {
     }
   }, [resumeIdParam, userResumes, selectedResume, triggerSearchParam]);
 
+  // Auto-detect client location from resume, IP, or timezone if optional location input is empty
+  const detectUserLocation = async (): Promise<string> => {
+    if (selectedResume?.content?.personalInfo?.location) {
+      return selectedResume.content.personalInfo.location;
+    }
+    try {
+      const res = await fetch("https://ipapi.co/json/", { signal: AbortSignal.timeout(2000) });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.city && data.country_name) {
+          return `${data.city}, ${data.country_name}`;
+        }
+      }
+    } catch (e) {}
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const parts = tz.split("/");
+      if (parts.length > 1) {
+        return `${parts[parts.length - 1].replace(/_/g, " ")}, ${parts[0]}`;
+      }
+    } catch (e) {}
+    return "";
+  };
+
   const handleResumeSelect = (resume: UserResume) => {
     setSelectedResume(resume);
   };
 
-  const handleSearchSubmit = () => {
+  const handleSearchSubmit = async () => {
     if (!selectedResume) return;
+    let locationToUse = filterLocation;
+    if (!locationToUse || locationToUse.trim().length === 0) {
+      locationToUse = await detectUserLocation();
+    }
     searchByResume(selectedResume.content.skills || [], {
-      location: filterLocation,
+      location: locationToUse,
       radius: filterRadius,
       isRemote: filterRemote,
       jobType: filterJobType,
@@ -134,8 +162,10 @@ function JobsPageContent() {
     router.push(`/jobs/${job.id}`);
   };
 
-  const handleApplyNow = () => {
-    if (!selectedJob) return;
+  const handleApplyNow = (targetJob?: Job) => {
+    const jobToApply = targetJob || selectedJob;
+    if (!jobToApply) return;
+    setSelectedJob(jobToApply);
     setIsEmailModalOpen(true);
   };
 
@@ -414,23 +444,39 @@ function JobsPageContent() {
 
                 {/* Loading state */}
                 {isLoading && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {[...Array(6)].map((_, i) => (
-                      <div key={i} className="p-8 rounded-[40px] bg-white border border-slate-100 shadow-sm h-[400px]">
-                        <div className="flex items-start justify-between mb-8">
-                          <Skeleton className="w-16 h-16 rounded-[22px] bg-slate-50" />
-                          <Skeleton className="w-10 h-10 rounded-2xl bg-slate-50" />
+                  <div className="space-y-8">
+                    <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white rounded-3xl p-8 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-6 overflow-hidden relative animate-pulse">
+                      <div className="space-y-2 relative z-10 text-center sm:text-left">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-[10px] font-black uppercase tracking-widest backdrop-blur-md">
+                          <Sparkles className="w-3.5 h-3.5 text-blue-200 animate-spin" />
+                          JobVanta AI Engine Active
                         </div>
-                        <Skeleton className="w-3/4 h-6 mb-4 bg-slate-50" />
-                        <Skeleton className="w-1/2 h-4 mb-8 bg-slate-50" />
-                        <div className="space-y-3 mb-10">
-                          <Skeleton className="w-full h-4 bg-slate-50" />
-                          <Skeleton className="w-full h-4 bg-slate-50" />
-                          <Skeleton className="w-2/3 h-4 bg-slate-50" />
-                        </div>
-                        <Skeleton className="w-full h-14 rounded-2xl bg-slate-50" />
+                        <h3 className="text-2xl font-black tracking-tight">Matching opportunities tailored to your CV...</h3>
+                        <p className="text-blue-100 text-xs font-medium">Scanning verified tech companies, salaries, and remote openings in real-time.</p>
                       </div>
-                    ))}
+                      <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-xl flex items-center justify-center shrink-0 border border-white/30 shadow-lg">
+                        <Loader2 className="w-7 h-7 text-white animate-spin" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                      {[...Array(6)].map((_, i) => (
+                        <div key={i} className="p-8 rounded-[40px] bg-white border border-slate-100 shadow-sm h-[400px]">
+                          <div className="flex items-start justify-between mb-8">
+                            <Skeleton className="w-16 h-16 rounded-[22px] bg-slate-50" />
+                            <Skeleton className="w-10 h-10 rounded-2xl bg-slate-50" />
+                          </div>
+                          <Skeleton className="w-3/4 h-6 mb-4 bg-slate-50" />
+                          <Skeleton className="w-1/2 h-4 mb-8 bg-slate-50" />
+                          <div className="space-y-3 mb-10">
+                            <Skeleton className="w-full h-4 bg-slate-50" />
+                            <Skeleton className="w-full h-4 bg-slate-50" />
+                            <Skeleton className="w-2/3 h-4 bg-slate-50" />
+                          </div>
+                          <Skeleton className="w-full h-14 rounded-2xl bg-slate-50" />
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -453,6 +499,7 @@ function JobsPageContent() {
                         job={job} 
                         index={index} 
                         onApply={() => handleViewJob(job)}
+                        onApplyNow={() => handleApplyNow(job)}
                       />
                     ))}
                   </div>

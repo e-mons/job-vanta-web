@@ -10,6 +10,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, ChevronRight, User, LogOut, LayoutDashboard, Search, FileText, Star, Briefcase } from 'lucide-react';
 import { useSubscriptionStore } from '@/store/useSubscription';
 
+import { toast } from 'sonner';
+
 interface NavbarProps {
   user?: any;
   isDark?: boolean;
@@ -64,11 +66,20 @@ export default function Navbar({ user: initialUser, isDark = false }: NavbarProp
   }, []);
 
   const handleSignOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    resetJobs();
-    resetResumes();
-    router.refresh();
+    setIsUserDropdownOpen(false);
+    setIsMobileMenuOpen(false);
+    setUser(null);
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      resetJobs();
+      resetResumes();
+      toast.success("Signed out successfully");
+      window.location.href = "/";
+    } catch (err) {
+      console.error("Sign out error:", err);
+      window.location.href = "/";
+    }
   };
 
   const navLinks = [

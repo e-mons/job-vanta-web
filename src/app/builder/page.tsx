@@ -171,13 +171,18 @@ function BuilderContent() {
                         <button 
                           onClick={(e) => {
                             e.preventDefault();
-                            toast.warning('Are you sure you want to delete this resume?', {
-                              description: 'This action cannot be undone.',
+                            e.stopPropagation();
+                            toast.warning('Delete this resume?', {
+                              description: 'All linked cover letters and applications will also be permanently removed.',
                               action: {
-                                label: 'Delete',
-                                onClick: () => {
-                                  deleteResume(resume.id);
-                                  toast.success('Resume deleted successfully');
+                                label: 'Yes, Delete',
+                                onClick: async () => {
+                                  try {
+                                    await deleteResume(resume.id);
+                                    toast.success('Resume deleted successfully');
+                                  } catch (err: any) {
+                                    toast.error(`Delete failed: ${err.message || 'Please try again.'}`);
+                                  }
                                 }
                               }
                             });

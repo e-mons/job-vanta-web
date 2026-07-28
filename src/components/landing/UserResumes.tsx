@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { motion } from "framer-motion";
-import { Plus, FileText, Sparkles, Clock, ArrowRight, ShieldCheck, Copy, Trash2, Loader2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Plus, FileText, Sparkles, Clock, ArrowRight, ShieldCheck, Copy, Trash2, Loader2, AlertTriangle } from "lucide-react";
 import { useResumeStore } from '@/store/useResumeStore';
 import { useSubscriptionStore } from '@/store/useSubscription';
 import UpgradeModal from '@/components/shared/UpgradeModal';
@@ -41,14 +41,35 @@ export default function UserResumes() {
     setIsDuplicating(null);
   };
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  const handleDeleteRequest = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
-    if (confirm("Are you sure you want to delete this resume?")) {
-      setIsDeleting(id);
+    e.stopPropagation();
+    setConfirmDeleteId(id);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!confirmDeleteId) return;
+    const id = confirmDeleteId;
+    setConfirmDeleteId(null);
+    setIsDeleting(id);
+    try {
       await deleteResume(id);
+      // Dynamic import to avoid SSR issues with sonner
+      const { toast } = await import('sonner');
+      toast.success('Resume deleted successfully');
+    } catch (err: any) {
+      const { toast } = await import('sonner');
+      toast.error(`Failed to delete resume: ${err.message || 'Please try again.'}`);
+    } finally {
       setIsDeleting(null);
     }
   };
+
+  const handleDeleteCancel = () => setConfirmDeleteId(null);
+
+  const handleDelete = handleDeleteRequest;
 
   const premium = isPremium();
 
@@ -177,6 +198,55 @@ export default function UserResumes() {
         onClose={() => setIsUpgradeModalOpen(false)} 
         reason={upgradeReason}
       />
+
+      {/* Inline Delete Confirmation Modal */}
+      <AnimatePresence>
+        {confirmDeleteId && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={handleDeleteCancel}
+              className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+              className="relative w-full max-w-sm bg-white rounded-[28px] shadow-2xl border border-slate-200/60 p-8 text-center"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center mx-auto mb-5">
+                <AlertTriangle className="w-7 h-7 text-red-500" />
+              </div>
+              <h3 className="text-xl font-black text-slate-900 mb-2">Delete Resume?</h3>
+              <p className="text-sm font-medium text-slate-500 leading-relaxed mb-8">
+                This will permanently delete this resume and all its associated data including cover letters and applications. This action cannot be undone.
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleDeleteCancel}
+                  className="flex-1 py-3 rounded-2xl border border-slate-200 text-slate-700 font-black text-sm hover:bg-slate-50 transition-all active:scale-95"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteConfirm}
+                  className="flex-1 py-3 rounded-2xl bg-red-600 text-white font-black text-sm hover:bg-red-700 shadow-lg shadow-red-600/20 transition-all active:scale-95"
+                >
+                  Yes, Delete
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

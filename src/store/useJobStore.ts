@@ -91,13 +91,18 @@ export const useJobStore = create<JobState>()((set, get) => ({
   searchJobs: async (query, location) => {
     set({ isLoading: true, error: null, searchQuery: query, locationFilter: location || "" });
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+
       const res = await fetch(`/api/jobs/search`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ query, location }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Search request failed");
@@ -123,13 +128,18 @@ export const useJobStore = create<JobState>()((set, get) => ({
   searchByResume: async (skills, filters) => {
     set({ isLoading: true, error: null, hasSearched: true });
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+
       const res = await fetch(`/api/jobs/search`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ skills, filters }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Resume search failed");

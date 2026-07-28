@@ -20,6 +20,7 @@ import { useJobStore } from "@/store/useJobStore";
 import { useResumeStore } from "@/store/useResumeStore";
 import { useNotificationStore } from "@/store/useNotificationStore";
 import { useSubscriptionStore } from "@/store/useSubscription";
+import { toast } from "sonner";
 
 export default function DashboardHeader() {
   const [isOpen, setIsOpen] = useState(false);
@@ -50,11 +51,19 @@ export default function DashboardHeader() {
   }, []);
 
   const handleSignOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    resetJobs();
-    resetResumes();
-    router.push("/");
+    setIsOpen(false);
+    setUser(null);
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      resetJobs();
+      resetResumes();
+      toast.success("Signed out successfully");
+      window.location.href = "/";
+    } catch (err) {
+      console.error("Sign out error:", err);
+      window.location.href = "/";
+    }
   };
 
   return (
