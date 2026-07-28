@@ -93,7 +93,7 @@ export default function DashboardHeader() {
               exit={{ opacity: 0, y: 8, scale: 0.95 }}
               className="absolute right-0 mt-3 w-72 origin-top-right z-50"
             >
-              <div className="bg-white rounded-[2rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.15)] border border-slate-100 overflow-hidden">
+              <div className="bg-white rounded-[2rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.15)] border border-slate-100 overflow-hidden max-h-[calc(100vh-80px)] overflow-y-auto custom-dropdown-scrollbar">
                 {/* Profile Header */}
                 <div className="p-6 bg-slate-50/50 border-b border-slate-100">
                   <div className="flex items-center gap-3">

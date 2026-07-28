@@ -147,7 +147,7 @@ export default function Navbar({ user: initialUser, isDark = false }: NavbarProp
                       exit={{ opacity: 0, y: 15, scale: 0.95 }}
                       className="absolute right-0 mt-4 w-80 origin-top-right z-[60]"
                     >
-                      <div className="bg-white/80 backdrop-blur-2xl shadow-[0_30px_100px_-20px_rgba(0,0,0,0.15)] rounded-[2.5rem] border border-white overflow-hidden ring-1 ring-black/5">
+                      <div className="bg-white/80 backdrop-blur-2xl shadow-[0_30px_100px_-20px_rgba(0,0,0,0.15)] rounded-[2.5rem] border border-white overflow-hidden ring-1 ring-black/5 max-h-[calc(100vh-100px)] overflow-y-auto custom-dropdown-scrollbar">
                         {/* Profile Header */}
                         <div className="p-8 bg-gradient-to-br from-blue-600/5 via-transparent to-indigo-600/5 border-b border-slate-100/50">
                           <div className="flex items-center gap-4">
