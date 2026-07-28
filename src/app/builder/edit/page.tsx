@@ -992,21 +992,21 @@ function BuilderEditContent() {
                     Upload Image
                     <input 
                       type="file" 
-                      accept="image/png, image/jpeg, image/jpg" 
+                      accept="image/png, image/jpeg, image/jpg, image/webp" 
                       className="hidden" 
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         const file = e.target.files?.[0];
-                        if (file) {
-                          // Check size (max 2MB)
-                          if (file.size > 2 * 1024 * 1024) {
-                            toast.error("Image must be smaller than 2MB.");
-                            return;
-                          }
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            updatePersonalInfo({ photo: reader.result as string });
-                          };
-                          reader.readAsDataURL(file);
+                        // Reset so the same file can be re-selected if needed
+                        e.target.value = "";
+                        if (!file) return;
+
+                        try {
+                          // Auto-compress to ≤800px and reasonable file size regardless of input size
+                          const { compressProfileImage } = await import('@/utils/imageCompressor');
+                          const dataUrl = await compressProfileImage(file);
+                          updatePersonalInfo({ photo: dataUrl });
+                        } catch (err) {
+                          toast.error("Could not load image. Please try a different file.");
                         }
                       }}
                     />

@@ -23,10 +23,9 @@ export async function callGeminiWithFallback(
 ) {
   const {
     modelNames = [
-      "gemini-2.0-flash",
-      "gemini-1.5-flash",
-      "gemini-2.0-flash-lite-preview-02-05",
-      "gemini-1.5-pro"
+      "gemini-flash-latest",
+      "gemini-3.6-flash",
+      "gemini-3.1-flash-lite"
     ],
     maxRetries = 1,
     responseMimeType

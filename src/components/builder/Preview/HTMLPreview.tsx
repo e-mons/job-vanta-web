@@ -97,20 +97,19 @@ const PhotoUploadWrapper = ({ children }: { children: React.ReactNode }) => {
       </div>
       <input 
         type="file" 
-        accept="image/png, image/jpeg, image/jpg" 
+        accept="image/png, image/jpeg, image/jpg, image/webp" 
         className="hidden" 
-        onChange={(e) => {
+        onChange={async (e) => {
           const file = e.target.files?.[0];
-          if (file) {
-            if (file.size > 2 * 1024 * 1024) {
-              toast.error("Image must be smaller than 2MB.");
-              return;
-            }
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              updatePersonalInfo({ photo: reader.result as string });
-            };
-            reader.readAsDataURL(file);
+          e.target.value = "";
+          if (!file) return;
+
+          try {
+            const { compressProfileImage } = await import('@/utils/imageCompressor');
+            const dataUrl = await compressProfileImage(file);
+            updatePersonalInfo({ photo: dataUrl });
+          } catch {
+            toast.error("Could not load image. Please try a different file.");
           }
         }}
       />
