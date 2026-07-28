@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
-import { callGeminiWithFallback } from "@/utils/gemini";
+import { GoogleGenAI } from "@google/genai";
 
-const nullableString = z.preprocess((val) => (val === null ? "" : val), z.string().default(""));
+const apiKey = process.env.GEMINI_API_KEY?.trim();
+const ai = new GoogleGenAI({ apiKey: apiKey || "" });
+
+const nullableString = z.preprocess((val) => (val === null || val === undefined ? "" : String(val)), z.string().default(""));
 
 const ExtractedResumeSchema = z.object({
   personalInfo: z.object({
@@ -44,86 +47,181 @@ const ExtractedResumeSchema = z.object({
   })).default([])
 });
 
+const PARSE_PROMPT = `
+You are an expert ATS resume parser. Extract the full structured content from this resume document.
+
+Requirements:
+- personalInfo: Extract fullName, email, phone, location, website, and a professional summary.
+- experience: Array of all work experiences with company, role, dates (e.g. "Jan 2021 – Mar 2023"), and an array of bullet-point responsibilities/achievements.
+- education: Array of all education entries with school, degree, and dates.
+- skills: Flat array of all skill strings.
+- projects: Array of personal or professional projects with name, description, technologies array, and link.
+
+Rules:
+- Never return null for any string field — use empty string "" instead.
+- If a field is not present in the document, return an empty string or empty array.
+- Return ONLY raw valid JSON, no markdown, no backticks, no code fences.
+
+JSON structure:
+{
+  "personalInfo": { "fullName": "", "email": "", "phone": "", "location": "", "website": "", "summary": "" },
+  "experience": [{ "company": "", "role": "", "dates": "", "bullets": [] }],
+  "education": [{ "school": "", "degree": "", "dates": "" }],
+  "skills": [],
+  "projects": [{ "name": "", "description": "", "technologies": [], "link": "" }]
+}
+`;
+
+/**
+ * Parse a PDF/DOCX using the new Google GenAI Files API (recommended for binary files)
+ */
+async function parseWithFilesAPI(bytes: ArrayBuffer, mimeType: string): Promise<string> {
+  const blob = new Blob([bytes], { type: mimeType });
+
+  // Upload file via Files API
+  const uploadResponse = await ai.files.upload({
+    file: blob,
+    config: { mimeType },
+  });
+
+  const fileUri = uploadResponse.uri;
+  if (!fileUri) throw new Error("File upload to Gemini failed — no URI returned.");
+
+  // Generate content with the uploaded file reference
+  const response = await ai.models.generateContent({
+    model: "gemini-2.0-flash",
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { text: PARSE_PROMPT },
+          { fileData: { fileUri, mimeType } }
+        ]
+      }
+    ],
+    config: {
+      responseMimeType: "application/json",
+    }
+  });
+
+  const text = response.text;
+  if (!text) throw new Error("Gemini returned an empty response for the uploaded file.");
+  return text;
+}
+
+/**
+ * Parse plain text file by sending text inline
+ */
+async function parseWithInlineText(textContent: string): Promise<string> {
+  const response = await ai.models.generateContent({
+    model: "gemini-2.0-flash",
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { text: PARSE_PROMPT + "\n\nResume text to parse:\n" + textContent }
+        ]
+      }
+    ],
+    config: {
+      responseMimeType: "application/json",
+    }
+  });
+
+  const text = response.text;
+  if (!text) throw new Error("Gemini returned an empty response.");
+  return text;
+}
+
+/**
+ * Safely parse and validate the JSON string from Gemini
+ */
+function parseAndValidate(rawText: string) {
+  let cleaned = rawText.trim();
+
+  // Strip markdown code fences if present
+  if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```(?:json)?\n?/i, "").replace(/\n?```$/, "").trim();
+  }
+
+  // Find first valid JSON object
+  const startIdx = cleaned.indexOf("{");
+  const endIdx = cleaned.lastIndexOf("}");
+  if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+    cleaned = cleaned.substring(startIdx, endIdx + 1);
+  }
+
+  const parsed = JSON.parse(cleaned);
+  return ExtractedResumeSchema.parse(parsed);
+}
+
 export async function POST(req: NextRequest) {
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "Gemini API key is not configured. Please add GEMINI_API_KEY to your .env.local file." },
+      { status: 500 }
+    );
+  }
+
   try {
     const formData = await req.formData();
-    const file = formData.get("file") as File;
+    const file = formData.get("file") as File | null;
 
     if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+      return NextResponse.json({ error: "No file provided." }, { status: 400 });
     }
 
     const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    
-    // Using inline data for Gemini
     const mimeType = file.type || "application/pdf";
-    const base64Data = buffer.toString('base64');
+    const fileName = file.name?.toLowerCase() || "";
 
-    const prompt = `
-      You are an expert ATS resume parser.
-      Extract the content of this resume into a structured JSON format.
-      
-      Requirements:
-      - Include personalInfo (fullName, email, phone, location, website, summary).
-      - Include experience (array of objects with company, role, dates, bullets).
-      - Include education (array of objects with school, degree, dates).
-      - Include skills (array of strings).
-      - Include projects (array of objects with name, description, technologies, link).
-      
-      Respond ONLY with the raw JSON. Ensure all fields exist. Do not output markdown code blocks.
-    `;
+    let rawText: string;
 
-    const text = await callGeminiWithFallback(
-      [
-        { text: prompt },
-        {
-          inlineData: {
-            data: base64Data,
-            mimeType
-          }
-        }
-      ],
-      { responseMimeType: "application/json" }
-    );
-    
-    let data;
-    try {
-        // Try to find JSON block if it exists, otherwise parse full text
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        const jsonToParse = jsonMatch ? jsonMatch[0] : text;
-        data = JSON.parse(jsonToParse);
-    } catch (e) {
-        console.error("Failed to parse Gemini response:", text);
-        throw new Error("The AI returned an invalid response format. Please try again or use a different file.");
+    if (fileName.endsWith(".txt")) {
+      // Plain text — decode and send inline
+      const textContent = new TextDecoder("utf-8").decode(bytes);
+      rawText = await parseWithInlineText(textContent);
+    } else {
+      // PDF, DOCX, or other binary — use Files API
+      rawText = await parseWithFilesAPI(bytes, mimeType);
     }
 
-    const validatedData = ExtractedResumeSchema.parse(data);
+    const validatedData = parseAndValidate(rawText);
 
-    // Assign fresh IDs (ignore AI hallucinated ones which might be duplicates)
+    // Assign fresh IDs
     const finalData = {
       ...validatedData,
       experience: validatedData.experience.map(exp => ({ ...exp, id: uuidv4() })),
       education: validatedData.education.map(edu => ({ ...edu, id: uuidv4() })),
-      projects: validatedData.projects.map(proj => ({ ...proj, id: uuidv4() }))
+      projects: validatedData.projects.map(proj => ({ ...proj, id: uuidv4() })),
     };
 
     return NextResponse.json({ success: true, data: finalData });
-  } catch (error: any) {
-    let errorMessage = error.message || "Failed to parse resume";
-    
-    if (error.message?.includes("API key not valid") || error.message?.includes("unregistered callers")) {
-      errorMessage = "Google AI API Key is missing or invalid. Please add GEMINI_API_KEY to your web/.env.local file.";
-    }
 
-    console.error("Resume parsing error details:", {
+  } catch (error: any) {
+    console.error("[Resume Parse] Error:", {
       message: error.message,
       stack: error.stack,
     });
 
-    return NextResponse.json({ 
-      error: errorMessage,
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    }, { status: error.status || 500 });
+    let userMessage = "Failed to parse resume. Please try again.";
+
+    if (error.message?.includes("API key") || error.message?.includes("unregistered callers")) {
+      userMessage = "Gemini API key is invalid or missing. Please check your GEMINI_API_KEY environment variable.";
+    } else if (error.message?.includes("quota") || error.message?.toLowerCase().includes("rate limit")) {
+      userMessage = "AI quota exceeded. Please wait a moment and try again.";
+    } else if (error.message?.includes("fetch failed") || error.message?.includes("network")) {
+      userMessage = "Network error connecting to AI service. Please check your internet connection.";
+    } else if (error.message?.includes("JSON")) {
+      userMessage = "The AI could not extract structured data from your file. Try a cleaner PDF or copy-paste your resume as a .txt file.";
+    }
+
+    return NextResponse.json(
+      {
+        error: userMessage,
+        details: process.env.NODE_ENV === "development" ? error.message : undefined,
+      },
+      { status: 500 }
+    );
   }
 }

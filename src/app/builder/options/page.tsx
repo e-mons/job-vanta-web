@@ -26,62 +26,79 @@ function BuilderOptionsContent() {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    // Reset input so the same file can be re-selected after an error
+    e.target.value = "";
     if (!file) return;
+
+    // Client-side validation
+    const allowedTypes = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"];
+    const allowedExtensions = [".pdf", ".docx", ".txt"];
+    const fileExt = file.name.split(".").pop()?.toLowerCase() || "";
+    const isAllowed = allowedTypes.includes(file.type) || allowedExtensions.includes(`.${fileExt}`);
+
+    if (!isAllowed) {
+      toast.error("Unsupported file type. Please upload a PDF, DOCX, or TXT file.");
+      return;
+    }
+
+    const maxSizeMB = 10;
+    if (file.size > maxSizeMB * 1024 * 1024) {
+      toast.error(`File too large. Maximum size is ${maxSizeMB}MB.`);
+      return;
+    }
 
     setIsUploading(true);
     setUploadProgress(10);
 
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append("file", file);
 
     try {
-      setUploadProgress(30);
-      
-      const response = await fetch('/api/resume/parse', {
-        method: 'POST',
+      setUploadProgress(25);
+
+      const response = await fetch("/api/resume/parse", {
+        method: "POST",
         body: formData,
       });
 
-      let resultData;
+      setUploadProgress(60);
+
+      let resultData: any;
       try {
         resultData = await response.json();
-      } catch (e) {
-        throw new Error('Failed to parse server response');
+      } catch {
+        throw new Error("Failed to read server response. The server may be overloaded. Please try again.");
       }
 
-      if (!response.ok) {
-        throw new Error(resultData.error || 'Failed to parse resume');
+      if (!response.ok || !resultData?.success) {
+        throw new Error(resultData?.error || "Failed to extract resume data. Please try again.");
       }
-      
+
       setUploadProgress(80);
-      const { success, data, error } = resultData;
-      
-      if (!success || error) {
-        throw new Error(error || 'Failed to extract resume data');
-      }
 
-      setUploadProgress(90);
-      
+      const { data } = resultData;
       const { createResume } = useResumeStore.getState();
-      
-      const newId = await createResume(
-        data.personalInfo?.fullName ? `${data.personalInfo.fullName}'s Resume` : 'Imported Resume',
-        data
-      );
 
+      const resumeTitle = data.personalInfo?.fullName
+        ? `${data.personalInfo.fullName}'s Resume`
+        : "Imported Resume";
+
+      const newId = await createResume(resumeTitle, data);
       setUploadProgress(100);
+
+      toast.success("Resume imported successfully!");
 
       setTimeout(() => {
         if (newId) {
           router.push(`/builder/edit?id=${newId}`);
         } else {
-          router.push('/builder/edit');
+          router.push("/builder/edit");
         }
-      }, 400);
+      }, 500);
 
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Failed to parse resume. Please try starting from scratch.');
+    } catch (error: any) {
+      console.error("[Resume Upload]", error);
+      toast.error(error.message || "Failed to parse resume. Please try starting from scratch.");
       setIsUploading(false);
       setUploadProgress(0);
     }
