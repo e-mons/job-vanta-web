@@ -170,7 +170,7 @@ export default function UserResumes() {
                   onClick={(e) => handleDuplicate(e, resume.id, resume.title)}
                   disabled={isDuplicating === resume.id}
                   title="Duplicate Resume"
-                  className="w-14 h-13 rounded-2xl border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition-all active:scale-95 shadow-sm disabled:opacity-50"
+                  className="w-14 h-[52px] rounded-2xl border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition-all active:scale-95 shadow-sm disabled:opacity-50"
                 >
                   {isDuplicating === resume.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <Copy className="w-5 h-5" />}
                 </button>
@@ -178,7 +178,7 @@ export default function UserResumes() {
                   onClick={(e) => handleDelete(e, resume.id)}
                   disabled={isDeleting === resume.id}
                   title="Delete Resume"
-                  className="w-14 h-13 rounded-2xl border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-all active:scale-95 shadow-sm disabled:opacity-50"
+                  className="w-14 h-[52px] rounded-2xl border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-all active:scale-95 shadow-sm disabled:opacity-50"
                 >
                   {isDeleting === resume.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
                 </button>

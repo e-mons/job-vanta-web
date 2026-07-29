@@ -165,7 +165,7 @@ function BuilderContent() {
                       </div>
                     </Link>
 
-                    <div className="p-4 pt-0">
+                    <div className="p-4 pt-0 relative z-10">
                       <div className="flex items-center justify-between mb-1">
                         <h3 className="font-bold text-slate-900 truncate flex-1">{resume.title || 'My Professional Resume'}</h3>
                         <button 

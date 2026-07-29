@@ -104,10 +104,15 @@ export const useJobStore = create<JobState>()((set, get) => ({
       });
       clearTimeout(timeoutId);
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Search request failed");
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error("The search service returned an unexpected response. Please try again.");
+      }
+      if (!res.ok) throw new Error(data?.error || "Search request failed");
       
-      set({ searchResults: data.jobs || [], isLoading: false });
+      set({ searchResults: data.jobs || [], isLoading: false, hasSearched: true });
 
       // Save search to history (fire-and-forget)
       const supabase = createClient();
@@ -141,8 +146,13 @@ export const useJobStore = create<JobState>()((set, get) => ({
       });
       clearTimeout(timeoutId);
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Resume search failed");
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error("The search service returned an unexpected response. Please try again.");
+      }
+      if (!res.ok) throw new Error(data?.error || "Resume search failed");
       
       set({
         searchResults: data.jobs || [],
