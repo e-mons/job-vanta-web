@@ -41,9 +41,11 @@ interface JobCardProps {
   index: number;
   onApply: () => void;
   onApplyNow?: () => void;
+  isLocked?: boolean;
+  onUpgradeClick?: () => void;
 }
 
-export default function JobCard({ job, index, onApply, onApplyNow }: JobCardProps) {
+export default function JobCard({ job, index, onApply, onApplyNow, isLocked, onUpgradeClick }: JobCardProps) {
   const { saveJob, unsaveJob, savedJobs, savedJobIds } = useJobStore();
   const { isPremium } = useSubscriptionStore();
   const resumeSkills = useResumeStore((s) => s.data.skills);
@@ -82,13 +84,32 @@ export default function JobCard({ job, index, onApply, onApplyNow }: JobCardProp
     }
   };
 
+  const handleCardClick = () => {
+    if (isLocked && onUpgradeClick) {
+      onUpgradeClick();
+    } else {
+      onApply();
+    }
+  };
+
+  const handleApplyClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isLocked && onUpgradeClick) {
+      onUpgradeClick();
+    } else if (onApplyNow) {
+      onApplyNow();
+    } else {
+      onApply();
+    }
+  };
+
   return (
     <>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: index * 0.06 }}
-        onClick={onApply}
+        onClick={handleCardClick}
         className="group relative p-8 rounded-[40px] bg-white border border-slate-200/60 hover:border-blue-400 hover:shadow-[0_30px_60px_-20px_rgba(30,58,138,0.15)] transition-all duration-500 cursor-pointer"
       >
         <div className="relative z-10">
@@ -104,7 +125,14 @@ export default function JobCard({ job, index, onApply, onApplyNow }: JobCardProp
             </div>
 
             <button
-              onClick={handleToggleSave}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isLocked && onUpgradeClick) {
+                  onUpgradeClick();
+                  return;
+                }
+                handleToggleSave(e);
+              }}
               disabled={isTogglingSave}
               className={`p-3.5 rounded-2xl border transition-all duration-300 ${
                 isSaved
@@ -121,14 +149,21 @@ export default function JobCard({ job, index, onApply, onApplyNow }: JobCardProp
           </div>
 
           {/* Job Title & Company */}
-          <div className="mb-6">
-            <h3 className="text-xl font-bold text-slate-900 group-hover:text-blue-600 transition-colors leading-tight mb-2">
-              {job.title}
-            </h3>
-            <div className="flex items-center gap-2 text-sm text-slate-400 font-bold uppercase tracking-wider">
-              <Building2 className="w-4 h-4" />
-              {job.company}
+          <div className="mb-6 flex items-start justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900 group-hover:text-blue-600 transition-colors leading-tight mb-2">
+                {job.title}
+              </h3>
+              <div className="flex items-center gap-2 text-sm text-slate-400 font-bold uppercase tracking-wider">
+                <Building2 className="w-4 h-4" />
+                {job.company}
+              </div>
             </div>
+            {isLocked && (
+              <div className="p-2 rounded-xl bg-slate-100 text-slate-400">
+                <Lock className="w-4 h-4" />
+              </div>
+            )}
           </div>
 
           {/* Meta Tags */}
@@ -194,21 +229,27 @@ export default function JobCard({ job, index, onApply, onApplyNow }: JobCardProp
                 ? (isSaved ? "Unsaving..." : "Saving...") 
                 : (isSaved ? "Saved" : "Save Job")}</span>
             </button>
-
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onApplyNow) {
-                  onApplyNow();
-                } else {
-                  onApply();
-                }
-              }}
-              className="group/apply w-full py-3 px-3 rounded-2xl font-black text-[11px] uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 border border-blue-600 text-white hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg hover:shadow-blue-600/25 active:scale-[0.98]"
-            >
-              <Send className="w-3.5 h-3.5 text-blue-200 group-hover/apply:translate-x-0.5 group-hover/apply:-translate-y-0.5 transition-transform" />
-              <span>Apply Now</span>
-            </button>
+              {/* Apply Button */}
+              <button
+                onClick={handleApplyClick}
+                className={`group/btn w-full py-3 px-3 rounded-2xl font-black text-[11px] uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 border shadow-sm active:scale-[0.98] ${
+                  isLocked 
+                    ? "bg-slate-100 text-slate-400 border-slate-200" 
+                    : "bg-gradient-to-r from-blue-600 to-indigo-600 border-blue-600 text-white hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg hover:shadow-blue-600/25"
+                }`}
+              >
+                {isLocked ? (
+                  <>
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Unlock to Apply</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5 text-blue-200 group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5 transition-transform" />
+                    <span>Apply Now</span>
+                  </>
+                )}
+              </button>
           </div>
 
           {/* Hover Arrow */}

@@ -3,6 +3,8 @@ import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 
+export const maxDuration = 60;
+
 const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
 const ai = new GoogleGenAI({ apiKey });
 
@@ -11,7 +13,7 @@ const searchCache = new Map<string, { timestamp: number; jobs: any[]; queryStr: 
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
 // Verified active models (tested 2026-07-29)
-const MODELS = ["gemini-flash-latest", "gemini-3.6-flash", "gemini-3.1-flash-lite"];
+const MODELS = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"];
 
 // Job Schema
 const JobSchema = z.object({
@@ -263,10 +265,10 @@ Return ONLY a raw JSON array of 12 objects matching this structure EXACTLY (no m
     let validatedJobs: any[] = [];
 
     try {
-      // 8-second hard timeout for AI call
+      // 45-second hard timeout for AI call
       const aiPromise = callGemini(prompt);
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("AI timeout")), 8000)
+        setTimeout(() => reject(new Error("AI timeout")), 45000)
       );
 
       const content = await Promise.race([aiPromise, timeoutPromise]);

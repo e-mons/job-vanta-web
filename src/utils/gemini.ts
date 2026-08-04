@@ -8,9 +8,9 @@ const _apiKey = process.env.GEMINI_API_KEY?.trim() || "";
 const _ai = new GoogleGenAI({ apiKey: _apiKey });
 
 const ACTIVE_MODELS = [
-  "gemini-flash-latest",
-  "gemini-3.6-flash",
-  "gemini-3.1-flash-lite",
+  "gemini-1.5-flash",
+  "gemini-2.0-flash",
+  "gemini-1.5-pro",
 ];
 
 let _cachedModel: string | null = null;

@@ -69,7 +69,7 @@ export default function Hero() {
         >
           Land your dream <br />
           <span className="text-transparent bg-clip-text bg-gradient-to-b from-blue-400 to-blue-600">
-            career 10x faster.
+            job 10x faster.
           </span>
         </motion.h1>
 

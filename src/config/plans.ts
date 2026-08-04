@@ -26,10 +26,10 @@ export const PLANS: Plan[] = [
     priceId: null,
     description: 'Perfect for exploring the platform',
     features: [
-      'ATS-Friendly Resume Builder',
-      'Limited AI Suggestions',
-      'Job Search & Matching',
-      '3 Saved Resumes',
+      '1 Resume CV',
+      '6 Job Search Results',
+      'No Job Applications',
+      'Basic AI Suggestions',
       'Basic Support'
     ],
     cta: 'Start for Free',
@@ -44,10 +44,10 @@ export const PLANS: Plan[] = [
     priceId: 'pdt_0Newfu26VwAPCKJBoT8z5',
     description: 'Most popular for active job seekers',
     features: [
-      'Everything in Free',
+      '5 Resume CVs',
+      '18 Job Search Results',
+      'Full Job Applications',
       'Unlimited AI Resume Optimization',
-      'Priority Job Matching',
-      'Unlimited Resume Storage',
       'Priority Email Support',
       'Advanced Career Insights'
     ],
@@ -63,12 +63,12 @@ export const PLANS: Plan[] = [
     priceId: 'pdt_0NewgKeXYMkBEofXpxy9Z',
     description: 'Executive-level career management',
     features: [
-      'Everything in Pro',
+      'Unlimited Resumes',
+      'Unlimited Job Searches',
+      'Full Job Applications',
       'Dedicated Career Coach (AI)',
       'Portfolio Website Builder',
-      'Direct Recruiter Network',
-      '24/7 Premium Support',
-      'Interview Coaching (AI Video)'
+      'Direct Recruiter Network'
     ],
     cta: 'Go Enterprise',
     href: '/signup?plan=enterprise',

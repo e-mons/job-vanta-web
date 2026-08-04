@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createClient } from '@/utils/supabase/client';
+import { PLANS } from '@/config/plans';
 
 export type SubscriptionStatus = 
   | 'active' 
@@ -19,6 +20,7 @@ interface SubscriptionState {
   currentPeriodEnd: string | null;
   fetchSubscription: () => Promise<void>;
   isPremium: () => boolean;
+  getPlanTier: () => 'free' | 'pro' | 'enterprise';
   createCheckoutSession: (priceId: string) => Promise<void>;
   verifyAndSync: () => Promise<void>;
 }
@@ -70,6 +72,13 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   isPremium: () => {
     const { status } = get();
     return status === 'active' || status === 'trialing';
+  },
+
+  getPlanTier: () => {
+    const { status, planId } = get();
+    if (status !== 'active' && status !== 'trialing') return 'free';
+    const plan = PLANS.find((p) => p.priceId === planId);
+    return (plan?.id as 'pro' | 'enterprise') || 'free';
   },
 
   /**

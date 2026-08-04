@@ -9,6 +9,7 @@ interface UpgradeModalProps {
   isOpen: boolean;
   onClose: () => void;
   reason?: string;
+  targetTier?: 'pro' | 'enterprise';
 }
 
 const FEATURES = [
@@ -18,9 +19,9 @@ const FEATURES = [
   { icon: <ShieldCheck className="w-5 h-5 text-emerald-600" />, text: "Priority Support & Tracking" },
 ];
 
-export default function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
+export default function UpgradeModal({ isOpen, onClose, reason, targetTier = 'pro' }: UpgradeModalProps) {
   const { createCheckoutSession, isLoading } = useSubscriptionStore();
-  const proPlan = PLANS.find(p => p.id === 'pro')!;
+  const targetPlan = PLANS.find(p => p.id === targetTier)!;
 
   return (
     <AnimatePresence>
@@ -54,7 +55,7 @@ export default function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalPr
                     <Sparkles className="w-3.5 h-3.5" />
                     Premium Experience
                   </div>
-                  <h2 className="text-3xl font-bold tracking-tight text-slate-900">Upgrade to {proPlan.name}</h2>
+                  <h2 className="text-3xl font-bold tracking-tight text-slate-900">Upgrade to {targetPlan.name}</h2>
                 </div>
                 <button
                   onClick={onClose}
@@ -72,11 +73,11 @@ export default function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalPr
               )}
 
               <p className="text-slate-500 mb-10 leading-relaxed">
-                {proPlan.description}
+                {targetPlan.description}
               </p>
 
               <div className="space-y-5 mb-12">
-                {proPlan.features.slice(0, 4).map((feature, i) => (
+                {targetPlan.features.slice(0, 4).map((feature, i) => (
                   <motion.div
                     key={i}
                     initial={{ opacity: 0, x: -10 }}
@@ -98,18 +99,18 @@ export default function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalPr
 
               <div className="flex flex-col gap-5">
                 <motion.button
-                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => createCheckoutSession(proPlan.priceId!)}
                   disabled={isLoading}
-                  className="relative group w-full py-5 rounded-2xl bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-3 shadow-[0_10px_30px_rgba(37,99,235,0.2)] overflow-hidden"
+                  onClick={() => createCheckoutSession(targetPlan.priceId!)}
+                  className="w-full flex items-center justify-center gap-3 py-5 bg-slate-900 text-white rounded-2xl font-black text-lg shadow-xl shadow-slate-900/20 hover:bg-slate-800 transition-colors disabled:opacity-50"
                 >
                   {isLoading ? (
-                    <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    <span className="animate-pulse">Preparing Checkout...</span>
                   ) : (
                     <>
-                      <Zap className="w-5 h-5 fill-white" />
-                      Upgrade Now — ${proPlan.price}/mo
+                      <CreditCard className="w-5 h-5" />
+                      Upgrade to {targetPlan.name} for ${targetPlan.price}/mo
                     </>
                   )}
                 </motion.button>

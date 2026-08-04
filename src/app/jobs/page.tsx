@@ -29,6 +29,8 @@ import { createClient } from "@/utils/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { toast } from "sonner";
+import { useSubscriptionStore } from "@/store/useSubscription";
+import UpgradeModal from "@/components/shared/UpgradeModal";
 
 /**
  * Build a mailto: URL with pre-filled subject and body for job applications.
@@ -66,6 +68,7 @@ function JobsPageContent() {
     setHasSearched
   } = useJobStore();
   const { userResumes, fetchUserResumes, reset: resetResumes } = useResumeStore();
+  const { getPlanTier } = useSubscriptionStore();
   const [selectedResume, setSelectedResume] = useState<UserResume | null>(null);
   const router = useRouter();
 
@@ -79,6 +82,8 @@ function JobsPageContent() {
   
   // Modal states
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [upgradeTargetTier, setUpgradeTargetTier] = useState<'pro' | 'enterprise'>('pro');
 
   const searchParams = useSearchParams();
   const resumeIdParam = searchParams.get("resumeId");
@@ -167,6 +172,16 @@ function JobsPageContent() {
     if (!jobToApply) return;
     setSelectedJob(jobToApply);
     setIsEmailModalOpen(true);
+  };
+
+  const planTier = getPlanTier();
+  const displayLimit = planTier === 'free' ? 6 : planTier === 'pro' ? 18 : Infinity;
+  const displayedJobs = searchResults.slice(0, displayLimit);
+  const hasHiddenJobs = searchResults.length > displayLimit;
+
+  const handleUpgradePrompt = () => {
+    setUpgradeTargetTier(planTier === 'free' ? 'pro' : 'enterprise');
+    setIsUpgradeModalOpen(true);
   };
 
   return (
@@ -491,18 +506,37 @@ function JobsPageContent() {
                 )}
 
                 {/* Results grid */}
-                {!isLoading && searchResults.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {searchResults.map((job, index) => (
-                      <JobCard 
-                        key={job.id} 
-                        job={job} 
-                        index={index} 
-                        onApply={() => handleViewJob(job)}
-                        onApplyNow={() => handleApplyNow(job)}
-                      />
-                    ))}
-                  </div>
+                {!isLoading && displayedJobs.length > 0 && (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                      {displayedJobs.map((job, index) => (
+                        <JobCard 
+                          key={job.id} 
+                          job={job} 
+                          index={index} 
+                          onApply={() => handleViewJob(job)}
+                          onApplyNow={() => handleApplyNow(job)}
+                          isLocked={planTier === 'free'}
+                          onUpgradeClick={handleUpgradePrompt}
+                        />
+                      ))}
+                    </div>
+                    {hasHiddenJobs && (
+                      <div className="mt-12 p-8 rounded-3xl bg-gradient-to-r from-slate-900 to-blue-900 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-2xl relative overflow-hidden">
+                        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none" />
+                        <div className="relative z-10 text-center sm:text-left">
+                          <h4 className="text-2xl font-black text-white mb-2">Unlock {searchResults.length - displayLimit} more matching jobs!</h4>
+                          <p className="text-blue-200 font-medium max-w-md">You've reached the job search limit for your current plan. Upgrade your account to see all matches and apply instantly.</p>
+                        </div>
+                        <button
+                          onClick={handleUpgradePrompt}
+                          className="relative z-10 whitespace-nowrap px-8 py-4 rounded-2xl bg-white text-slate-900 font-black hover:bg-blue-50 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-black/20"
+                        >
+                          Upgrade Now
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {!isLoading && !error && searchResults.length === 0 && (
@@ -527,6 +561,18 @@ function JobsPageContent() {
           resume={selectedResume}
           isOpen={isEmailModalOpen}
           onClose={() => setIsEmailModalOpen(false)}
+        />
+
+        {/* Upgrade Modal */}
+        <UpgradeModal
+          isOpen={isUpgradeModalOpen}
+          onClose={() => setIsUpgradeModalOpen(false)}
+          targetTier={upgradeTargetTier}
+          reason={
+            upgradeTargetTier === 'enterprise'
+              ? "You've reached your Pro job limit. Upgrade to Enterprise for unlimited matches."
+              : "Free users have limited job search visibility and cannot apply. Upgrade to Pro!"
+          }
         />
       </div>
     </DashboardLayout>

@@ -5,6 +5,7 @@ import { X, Mail, Globe, Monitor } from "lucide-react";
 import { Job } from "@/store/useJobStore";
 import { useState, useEffect } from "react";
 import { UserResume, useResumeStore } from "@/store/useResumeStore";
+import { createClient } from "@/utils/supabase/client";
 
 interface EmailProviderModalProps {
   job: Job | null;
@@ -24,8 +25,11 @@ export function buildEmailLinks(job: Job, resume: UserResume | null) {
   const latestCompany = latestExp?.company || "my previous company";
   const firstBullet = latestExp?.bullets?.[0] || "delivered impactful results";
 
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://jobvanta.com";
+  const resumeLink = resume?.id ? `${baseUrl}/preview/${resume.id}` : baseUrl;
+
   const subject = `Application for ${job.title} — ${fullName}`;
-  const body = `Dear Hiring Manager,\n\nI am writing to express my strong interest in the ${job.title} position at ${job.company}, as listed on JobVanta.\n\nWith experience in ${topSkills}, I believe I would be a strong fit for this role. My background includes ${latestRole} at ${latestCompany}, where I ${firstBullet}.\n\nI have attached my resume for your review and would welcome the opportunity to discuss how my skills and experience align with your team's needs.\n\nThank you for your consideration. I look forward to hearing from you.\n\nBest regards,\n${fullName}${userEmail ? `\n${userEmail}` : ""}${userPhone ? `\n${userPhone}` : ""}`;
+  const body = `Dear Hiring Manager,\n\nI am writing to express my strong interest in the ${job.title} position at ${job.company}, as listed on JobVanta.\n\nWith experience in ${topSkills}, I believe I would be a strong fit for this role. My background includes ${latestRole} at ${latestCompany}, where I ${firstBullet}.\n\nI have attached my resume for your review, which you can view or download here: ${resumeLink}\n\nI would welcome the opportunity to discuss how my skills and experience align with your team's needs.\n\nThank you for your consideration. I look forward to hearing from you.\n\nBest regards,\n${fullName}${userEmail ? `\n${userEmail}` : ""}${userPhone ? `\n${userPhone}` : ""}`;
 
   const fallbackEmail = job.company ? `careers@${job.company.toLowerCase().replace(/[^a-z0-9]/g, '')}.com` : "hiring@company.com";
   const emailTo = job.contactEmail ? encodeURIComponent(job.contactEmail) : encodeURIComponent(fallbackEmail);
@@ -43,12 +47,87 @@ export function buildEmailLinks(job: Job, resume: UserResume | null) {
 export default function EmailProviderModal({ job, resume: initialResume, isOpen, onClose }: EmailProviderModalProps) {
   const { userResumes } = useResumeStore();
   const [selectedResume, setSelectedResume] = useState<UserResume | null>(initialResume);
+  const supabase = createClient();
 
   useEffect(() => {
     if (isOpen && initialResume) {
       setSelectedResume(initialResume);
     }
   }, [isOpen, initialResume]);
+
+  const handleApply = async (e: React.MouseEvent, link: string) => {
+    e.preventDefault();
+    if (!job || !selectedResume) return;
+
+    let newWin: Window | null = null;
+    const isWebLink = link.startsWith('http');
+    if (isWebLink) {
+      newWin = window.open('', '_blank');
+    }
+
+    try {
+      // Auto-download PDF
+      const downloadUrl = `/api/resume/export?id=${selectedResume.id}`;
+      const downloadLink = document.createElement("a");
+      downloadLink.href = downloadUrl;
+      downloadLink.setAttribute("download", `${selectedResume.title || 'Resume'}.pdf`);
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: appData, error: appError } = await supabase
+          .from("job_applications")
+          .insert({
+            user_id: user.id,
+            resume_id: selectedResume.id,
+            status: "applied",
+            metadata: {
+              title: job.title,
+              company: job.company,
+              location: job.location,
+              applyLink: job.applyLink || "",
+            }
+          })
+          .select()
+          .single();
+
+        if (!appError && appData) {
+          const resumeData = selectedResume.content;
+          const fullName = resumeData?.personalInfo?.fullName || "Applicant";
+          const topSkills = (resumeData?.skills || []).slice(0, 5).join(", ") || "relevant skills";
+          const latestExp = resumeData?.experience?.[0];
+          const latestRole = latestExp?.role || "my previous role";
+          const latestCompany = latestExp?.company || "my previous company";
+          const firstBullet = latestExp?.bullets?.[0] || "delivered impactful results";
+          const userEmail = resumeData?.personalInfo?.email || "";
+          const userPhone = resumeData?.personalInfo?.phone || "";
+
+          const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://jobvanta.com";
+          const resumeLink = selectedResume?.id ? `${baseUrl}/preview/${selectedResume.id}` : baseUrl;
+
+          const subject = `Application for ${job.title} — ${fullName}`;
+          const body = `Dear Hiring Manager,\n\nI am writing to express my strong interest in the ${job.title} position at ${job.company}, as listed on JobVanta.\n\nWith experience in ${topSkills}, I believe I would be a strong fit for this role. My background includes ${latestRole} at ${latestCompany}, where I ${firstBullet}.\n\nI have attached my resume for your review, which you can view or download here: ${resumeLink}\n\nI would welcome the opportunity to discuss how my skills and experience align with your team's needs.\n\nThank you for your consideration. I look forward to hearing from you.\n\nBest regards,\n${fullName}${userEmail ? "\\n" + userEmail : ""}${userPhone ? "\\n" + userPhone : ""}`;
+
+          await supabase.from("application_emails").insert({
+            application_id: appData.id,
+            subject,
+            body
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error saving application:", error);
+    } finally {
+      if (isWebLink && newWin) {
+        newWin.location.href = link;
+      } else if (!isWebLink) {
+        window.location.href = link;
+      }
+      onClose();
+    }
+  };
 
   if (!isOpen || !job) return null;
 
@@ -91,7 +170,7 @@ export default function EmailProviderModal({ job, resume: initialResume, isOpen,
                 href={links.gmail}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={onClose}
+                onClick={(e) => handleApply(e, links.gmail)}
                 className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white border-2 border-slate-100 hover:border-blue-500 hover:shadow-md transition-all group"
               >
                 <div className="w-12 h-12 rounded-xl bg-red-50 text-red-500 flex items-center justify-center">
@@ -107,7 +186,7 @@ export default function EmailProviderModal({ job, resume: initialResume, isOpen,
                 href={links.outlook}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={onClose}
+                onClick={(e) => handleApply(e, links.outlook)}
                 className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white border-2 border-slate-100 hover:border-blue-500 hover:shadow-md transition-all group"
               >
                 <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -123,7 +202,7 @@ export default function EmailProviderModal({ job, resume: initialResume, isOpen,
                 href={links.yahoo}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={onClose}
+                onClick={(e) => handleApply(e, links.yahoo)}
                 className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white border-2 border-slate-100 hover:border-blue-500 hover:shadow-md transition-all group"
               >
                 <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
@@ -143,7 +222,7 @@ export default function EmailProviderModal({ job, resume: initialResume, isOpen,
 
               <a
                 href={links.default}
-                onClick={onClose}
+                onClick={(e) => handleApply(e, links.default)}
                 className="w-full flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border-2 border-transparent hover:bg-slate-100 hover:border-slate-200 transition-all group"
               >
                 <div className="w-12 h-12 rounded-xl bg-white text-slate-600 shadow-sm flex items-center justify-center">
@@ -184,7 +263,7 @@ export default function EmailProviderModal({ job, resume: initialResume, isOpen,
                   )}
                 </div>
               )}
-              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100">
+              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100 mt-4">
                 <p className="text-xs font-bold text-amber-700 text-center leading-relaxed">
                   📎 Important: Web links cannot automatically attach files for security reasons. You MUST manually attach your downloaded PDF after the email draft opens!
                 </p>

@@ -15,6 +15,7 @@ import { TEMPLATES, CATEGORIES } from '@/constants/templates';
 import HTMLPreview from '@/components/builder/Preview/HTMLPreview';
 import { useSubscriptionStore } from '@/store/useSubscription';
 import { toast } from 'sonner';
+import UpgradeModal from "@/components/shared/UpgradeModal";
 
 
 
@@ -28,12 +29,14 @@ function BuilderContent() {
     deleteResume,
     isLoading 
   } = useResumeStore();
-  const { isPremium } = useSubscriptionStore();
+  const { isPremium, getPlanTier } = useSubscriptionStore();
   const searchParams = useSearchParams();
   const isNew = searchParams.get('new') === 'true';
   const isOptimizeMode = searchParams.get('optimize') === 'true';
   const [view, setView] = useState<'list' | 'templates'>('list');
   const [activeCategory, setActiveCategory] = useState<string>('All');
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [upgradeTargetTier, setUpgradeTargetTier] = useState<'pro' | 'enterprise'>('pro');
 
   useEffect(() => {
     fetchUserResumes().then(() => {
@@ -57,11 +60,26 @@ function BuilderContent() {
     ? TEMPLATES
     : TEMPLATES.filter(t => t.category === activeCategory);
 
-  const handleSelect = (id: string) => {
-    if (!isPremium() && userResumes.length >= 2) {
-      toast.error("Free accounts are limited to 2 resumes. Please upgrade to Premium or delete an existing resume to create a new one.");
+  const handleCreateNewClick = () => {
+    const tier = getPlanTier();
+    const resumeCount = userResumes.length;
+
+    if (tier === 'free' && resumeCount >= 1) {
+      setUpgradeTargetTier('pro');
+      setIsUpgradeModalOpen(true);
       return;
     }
+    
+    if (tier === 'pro' && resumeCount >= 5) {
+      setUpgradeTargetTier('enterprise');
+      setIsUpgradeModalOpen(true);
+      return;
+    }
+
+    setView('templates');
+  };
+
+  const handleSelect = (id: string) => {
     setTemplateId(id);
     router.push(`/builder/options?templateId=${id}`);
   };
@@ -98,7 +116,7 @@ function BuilderContent() {
                 My Resumes
               </button>
               <button 
-                onClick={() => setView('templates')}
+                onClick={handleCreateNewClick}
                 className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
                   view === 'templates' ? 'bg-white text-blue-600 shadow-[0_4px_12px_rgba(0,0,0,0.05)] ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-900'
                 }`}
@@ -127,7 +145,7 @@ function BuilderContent() {
                 </div>
                 {!isOptimizeMode && (
                   <button
-                    onClick={() => setView('templates')}
+                    onClick={handleCreateNewClick}
                     className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black shadow-xl shadow-blue-600/20 hover:bg-blue-700 transition-all flex items-center gap-3 active:scale-95"
                   >
                     <Plus className="w-5 h-5" />
@@ -283,6 +301,15 @@ function BuilderContent() {
             </motion.div>
           )}
         </AnimatePresence>
+        
+        <UpgradeModal 
+          isOpen={isUpgradeModalOpen} 
+          onClose={() => setIsUpgradeModalOpen(false)}
+          targetTier={upgradeTargetTier}
+          reason={upgradeTargetTier === 'enterprise' 
+            ? "You've reached your Pro limit of 5 resumes." 
+            : "Free users can only create 1 resume."}
+        />
       </div>
     </div>
     </DashboardLayout>
