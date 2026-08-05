@@ -72,11 +72,11 @@ export async function POST(req: Request) {
       case "subscription.canceled": {
         const subscription = event.data;
         
-        // Find user by dodo_customer_id
+        // Find user by dodo_subscription_id for exact match, fallback to dodo_customer_id if missing
         const { data: subData } = await supabase
           .from("subscriptions")
           .select("user_id")
-          .eq("dodo_customer_id", subscription.customer_id)
+          .eq(subscription.subscription_id ? "dodo_subscription_id" : "dodo_customer_id", subscription.subscription_id || subscription.customer_id)
           .single();
 
         if (subData) {
