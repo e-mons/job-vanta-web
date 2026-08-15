@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 import JobCard from "@/components/jobs/JobCard";
 import ResumeSelector from "@/components/jobs/ResumeSelector";
-import EmailProviderModal from "@/components/jobs/EmailProviderModal";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useJobStore, Job } from "@/store/useJobStore";
 import { useResumeStore, UserResume } from "@/store/useResumeStore";
@@ -31,28 +30,7 @@ import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { toast } from "sonner";
 import { useSubscriptionStore } from "@/store/useSubscription";
 import UpgradeModal from "@/components/shared/UpgradeModal";
-
-/**
- * Build a mailto: URL with pre-filled subject and body for job applications.
- * Falls back to the job's applyLink if no contactEmail is available.
- */
-function buildMailtoUrl(job: Job, resume: UserResume | null): string {
-  const resumeData = resume?.content;
-  const fullName = resumeData?.personalInfo?.fullName || "Applicant";
-  const userEmail = resumeData?.personalInfo?.email || "";
-  const userPhone = resumeData?.personalInfo?.phone || "";
-  const topSkills = (resumeData?.skills || []).slice(0, 5).join(", ") || "relevant skills";
-  const latestExp = resumeData?.experience?.[0];
-  const latestRole = latestExp?.role || "my previous role";
-  const latestCompany = latestExp?.company || "my previous company";
-  const firstBullet = latestExp?.bullets?.[0] || "delivered impactful results";
-
-  const subject = `Application for ${job.title} — ${fullName}`;
-  const body = `Dear Hiring Manager,\n\nI am writing to express my strong interest in the ${job.title} position at ${job.company}, as listed on JobVanta.\n\nWith experience in ${topSkills}, I believe I would be a strong fit for this role. My background includes ${latestRole} at ${latestCompany}, where I ${firstBullet}.\n\nI have attached my resume for your review and would welcome the opportunity to discuss how my skills and experience align with your team's needs.\n\nThank you for your consideration. I look forward to hearing from you.\n\nBest regards,\n${fullName}${userEmail ? `\n${userEmail}` : ""}${userPhone ? `\n${userPhone}` : ""}`;
-
-  const emailTo = job.contactEmail ? encodeURIComponent(job.contactEmail) : "";
-  return `mailto:${emailTo}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
+import ExtensionPromoModal from "@/components/jobs/ExtensionPromoModal";
 
 function JobsPageContent() {
   const { 
@@ -69,6 +47,7 @@ function JobsPageContent() {
   } = useJobStore();
   const { userResumes, fetchUserResumes, reset: resetResumes } = useResumeStore();
   const { getPlanTier } = useSubscriptionStore();
+  const planTier = getPlanTier();
   const [selectedResume, setSelectedResume] = useState<UserResume | null>(null);
   const router = useRouter();
 
@@ -81,7 +60,6 @@ function JobsPageContent() {
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
   
   // Modal states
-  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [upgradeTargetTier, setUpgradeTargetTier] = useState<'pro' | 'enterprise'>('pro');
 
@@ -163,21 +141,86 @@ function JobsPageContent() {
   };
 
   const handleViewJob = (job: Job) => {
+    if (planTier === 'free') {
+      setUpgradeTargetTier('pro');
+      setIsUpgradeModalOpen(true);
+      return;
+    }
     setSelectedJob(job);
     router.push(`/jobs/${job.id}`);
   };
 
-  const handleApplyNow = (targetJob?: Job) => {
-    const jobToApply = targetJob || selectedJob;
-    if (!jobToApply) return;
-    setSelectedJob(jobToApply);
-    setIsEmailModalOpen(true);
+  const supabase = createClient();
+
+  const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
+  const [pendingJobToApply, setPendingJobToApply] = useState<Job | null>(null);
+
+  const processApplication = async (jobToApply: Job) => {
+    if (!selectedResume) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Must be logged in to apply for jobs");
+
+      const { error } = await supabase.from("job_applications").insert({
+        user_id: user.id,
+        resume_id: selectedResume.id,
+        status: "applied",
+        metadata: {
+          title: jobToApply.title,
+          company: jobToApply.company,
+          location: jobToApply.location,
+          type: jobToApply.type,
+          salary: jobToApply.salary,
+          applyLink: jobToApply.applyLink,
+        },
+      });
+
+      if (error) throw error;
+      toast.success("Application tracked successfully!");
+      
+      // Pass CV data to the JobVanta Chrome Extension
+      window.postMessage({
+        type: "JOBVANTA_CV_DATA",
+        cv: selectedResume.content
+      }, "*");
+
+      window.open(jobToApply.applyLink, "_blank");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to log application.");
+    }
   };
 
-  const planTier = getPlanTier();
+  const handleApplyNow = async (targetJob?: Job) => {
+    if (planTier === 'free') {
+      setUpgradeTargetTier('pro');
+      setIsUpgradeModalOpen(true);
+      return;
+    }
+    
+    const jobToApply = targetJob || selectedJob;
+    if (!jobToApply || !selectedResume) {
+      toast.error("Please select a resume first!");
+      return;
+    }
+    
+    if (!jobToApply.applyLink) {
+      toast.error("No application link provided for this job.");
+      return;
+    }
+
+    const isExtensionInstalled = document.getElementById("jobvanta-extension-active");
+    if (!isExtensionInstalled) {
+      setPendingJobToApply(jobToApply);
+      setIsPromoModalOpen(true);
+    } else {
+      await processApplication(jobToApply);
+    }
+  };
+
   const displayLimit = planTier === 'free' ? 6 : planTier === 'pro' ? 18 : Infinity;
   const displayedJobs = searchResults.slice(0, displayLimit);
-  const hasHiddenJobs = searchResults.length > displayLimit;
+  const hasHiddenJobs = planTier !== 'enterprise' && searchResults.length === displayLimit;
 
   const handleUpgradePrompt = () => {
     setUpgradeTargetTier(planTier === 'free' ? 'pro' : 'enterprise');
@@ -518,6 +561,7 @@ function JobsPageContent() {
                           onApplyNow={() => handleApplyNow(job)}
                           isLocked={planTier === 'free'}
                           onUpgradeClick={handleUpgradePrompt}
+                          matchSkills={selectedResume?.content?.skills || []}
                         />
                       ))}
                     </div>
@@ -555,14 +599,6 @@ function JobsPageContent() {
           </AnimatePresence>
         </div>
 
-        {/* Email Provider Selection Modal */}
-        <EmailProviderModal
-          job={selectedJob}
-          resume={selectedResume}
-          isOpen={isEmailModalOpen}
-          onClose={() => setIsEmailModalOpen(false)}
-        />
-
         {/* Upgrade Modal */}
         <UpgradeModal
           isOpen={isUpgradeModalOpen}
@@ -573,6 +609,18 @@ function JobsPageContent() {
               ? "You've reached your Pro job limit. Upgrade to Enterprise for unlimited matches."
               : "Free users have limited job search visibility and cannot apply. Upgrade to Pro!"
           }
+        />
+
+        {/* Extension Promo Modal */}
+        <ExtensionPromoModal
+          isOpen={isPromoModalOpen}
+          onClose={() => setIsPromoModalOpen(false)}
+          onContinue={() => {
+            setIsPromoModalOpen(false);
+            if (pendingJobToApply) {
+              processApplication(pendingJobToApply);
+            }
+          }}
         />
       </div>
     </DashboardLayout>

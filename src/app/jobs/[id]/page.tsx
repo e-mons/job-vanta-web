@@ -33,28 +33,11 @@ import { useSubscriptionStore } from "@/store/useSubscription";
 import { Skeleton } from "@/components/ui/Skeleton";
 import MobileBottomNav from "@/components/navigation/MobileBottomNav";
 import CompanyLogo from "@/components/jobs/CompanyLogo";
-import EmailProviderModal from "@/components/jobs/EmailProviderModal";
 import { toast } from "sonner";
 import { Job } from "@/store/useJobStore";
-
-function buildMailtoUrl(job: Job, resume: UserResume | null): string {
-  const resumeData = resume?.content;
-  const fullName = resumeData?.personalInfo?.fullName || "Applicant";
-  const userEmail = resumeData?.personalInfo?.email || "";
-  const userPhone = resumeData?.personalInfo?.phone || "";
-  const topSkills = (resumeData?.skills || []).slice(0, 5).join(", ") || "relevant skills";
-  const latestExp = resumeData?.experience?.[0];
-  const latestRole = latestExp?.role || "my previous role";
-  const latestCompany = latestExp?.company || "my previous company";
-  const firstBullet = latestExp?.bullets?.[0] || "delivered impactful results";
-
-  const subject = `Application for ${job.title} — ${fullName}`;
-  const body = `Dear Hiring Manager,\n\nI am writing to express my strong interest in the ${job.title} position at ${job.company}, as listed on JobVanta.\n\nWith experience in ${topSkills}, I believe I would be a strong fit for this role. My background includes ${latestRole} at ${latestCompany}, where I ${firstBullet}.\n\nI have attached my resume for your review and would welcome the opportunity to discuss how my skills and experience align with your team's needs.\n\nThank you for your consideration. I look forward to hearing from you.\n\nBest regards,\n${fullName}${userEmail ? `\n${userEmail}` : ""}${userPhone ? `\n${userPhone}` : ""}`;
-
-  const emailTo = job.contactEmail ? encodeURIComponent(job.contactEmail) : "";
-  return `mailto:${emailTo}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
-
+import { createClient } from "@/utils/supabase/client";
+import ExtensionPromoModal from "@/components/jobs/ExtensionPromoModal";
+import UpgradeModal from "@/components/shared/UpgradeModal";
 
 export default function JobDetailsPage() {
   const params = useParams();
@@ -62,10 +45,73 @@ export default function JobDetailsPage() {
   const { id } = params;
   const { selectedJob, savedJobIds, saveJob, fetchSavedJobs } = useJobStore();
   const { userResumes, fetchUserResumes } = useResumeStore();
-  const { isPremium } = useSubscriptionStore();
+  const { isPremium, getPlanTier } = useSubscriptionStore();
+  const planTier = getPlanTier();
   const [isSaving, setIsSaving] = useState(false);
   const [selectedResume, setSelectedResume] = useState<UserResume | null>(null);
-  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const supabase = createClient();
+
+  const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+
+  const processApplication = async () => {
+    if (!selectedJob || !selectedResume) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Must be logged in to apply for jobs");
+
+      const { error } = await supabase.from("job_applications").insert({
+        user_id: user.id,
+        resume_id: selectedResume.id,
+        status: "applied",
+        metadata: {
+          title: selectedJob.title,
+          company: selectedJob.company,
+          location: selectedJob.location,
+          type: selectedJob.type,
+          salary: selectedJob.salary,
+          applyLink: selectedJob.applyLink,
+        },
+      });
+
+      if (error) throw error;
+      toast.success("Application tracked successfully!");
+      
+      // Pass CV data to the JobVanta Chrome Extension
+      window.postMessage({
+        type: "JOBVANTA_CV_DATA",
+        cv: selectedResume.content
+      }, "*");
+
+      // Open ATS link in new tab
+      window.open(selectedJob.applyLink, "_blank");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to log application.");
+    }
+  };
+
+  const handleApplyExternally = async () => {
+    if (planTier === 'free') {
+      setIsUpgradeModalOpen(true);
+      return;
+    }
+
+    if (!selectedJob || !selectedResume) return;
+
+    if (!selectedJob.applyLink) {
+      toast.error("No application link provided for this job.");
+      return;
+    }
+
+    const isExtensionInstalled = document.getElementById("jobvanta-extension-active");
+    if (!isExtensionInstalled) {
+      setIsPromoModalOpen(true);
+    } else {
+      await processApplication();
+    }
+  };
 
   useEffect(() => {
     fetchSavedJobs();
@@ -345,12 +391,12 @@ export default function JobDetailsPage() {
                   </button>
                   
                   <button 
-                    onClick={() => setIsEmailModalOpen(true)}
+                    onClick={handleApplyExternally}
                     disabled={!selectedResume}
                     className="w-full p-5 rounded-2xl bg-slate-900 text-white font-black text-sm hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
                   >
-                    <Mail className="w-4 h-4" />
-                    Apply via Email
+                    Apply Now
+                    <ExternalLink className="w-4 h-4" />
                   </button>
 
                   {selectedJob.company && (
@@ -365,18 +411,6 @@ export default function JobDetailsPage() {
                     </a>
                   )}
                 </div>
-
-                {!selectedJob.contactEmail && (
-                  <div className="p-5 rounded-2xl bg-amber-50 border border-amber-200 flex items-start gap-3 text-xs font-bold text-amber-700">
-                    <AlertTriangle className="w-5 h-5 shrink-0 text-amber-500" />
-                    <div className="space-y-1">
-                      <p className="text-amber-800 font-black">No Verified Application Email</p>
-                      <p className="leading-relaxed font-semibold">
-                        No direct recruiting email was verified for this role. We have configured a fallback email ({selectedJob.company ? `careers@${selectedJob.company.toLowerCase().replace(/[^a-z0-9]/g, '')}.com` : "hiring@company.com"}), but you should verify it before applying.
-                      </p>
-                    </div>
-                  </div>
-                )}
 
                 <div className="space-y-4 pt-4">
                   <div className="flex items-center gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-100">
@@ -439,23 +473,23 @@ export default function JobDetailsPage() {
         </div>
       </main>
 
-      <MobileBottomNav />
-
-      {/* Email Provider Selection Modal */}
-      <EmailProviderModal
-        job={selectedJob}
-        resume={selectedResume}
-        isOpen={isEmailModalOpen}
-        onClose={() => setIsEmailModalOpen(false)}
+      {/* Extension Promo Modal */}
+      <ExtensionPromoModal 
+        isOpen={isPromoModalOpen} 
+        onClose={() => setIsPromoModalOpen(false)}
+        onContinue={() => {
+          setIsPromoModalOpen(false);
+          processApplication();
+        }} 
+      />
+      <UpgradeModal
+        isOpen={isUpgradeModalOpen}
+        onClose={() => setIsUpgradeModalOpen(false)}
+        targetTier="pro"
+        reason="Free users cannot apply for jobs."
       />
 
-      {/* Employer Email Info */}
-      {selectedJob.contactEmail && (
-        <div className="fixed bottom-24 lg:bottom-6 right-6 z-40 px-4 py-3 rounded-2xl bg-emerald-50 border border-emerald-200 shadow-lg flex items-center gap-3 text-sm font-bold text-emerald-700 max-w-xs">
-          <Mail className="w-4 h-4 flex-shrink-0" />
-          <span className="truncate">{selectedJob.contactEmail}</span>
-        </div>
-      )}
+      <MobileBottomNav />
     </div>
   );
 }

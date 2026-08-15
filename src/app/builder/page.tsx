@@ -49,12 +49,21 @@ function BuilderContent() {
   useEffect(() => {
     if (!isLoading) {
       if (isNew || userResumes.length === 0) {
-        setView('templates');
+        const tier = getPlanTier();
+        const maxResumes = tier === 'enterprise' ? Infinity : (tier === 'pro' ? 5 : 1);
+        
+        if (userResumes.length >= maxResumes) {
+          setView('list');
+          setUpgradeTargetTier(tier === 'free' ? 'pro' : 'enterprise');
+          setIsUpgradeModalOpen(true);
+        } else {
+          setView('templates');
+        }
       } else {
         setView('list');
       }
     }
-  }, [userResumes.length, isLoading, isNew]);
+  }, [userResumes.length, isLoading, isNew, getPlanTier]);
 
   const filteredTemplates = activeCategory === 'All'
     ? TEMPLATES

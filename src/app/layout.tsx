@@ -52,6 +52,7 @@ export const viewport = {
 
 import { Toaster } from "sonner";
 import FloatingChatbot from "@/components/shared/FloatingChatbot";
+import AppInitializer from "@/components/shared/AppInitializer";
 
 export default function RootLayout({
   children,
@@ -88,6 +89,7 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.variable} ${outfit.variable} font-sans min-h-screen bg-white text-slate-900 antialiased`}>
+        <AppInitializer />
         {children}
         <Toaster richColors position="top-right" closeButton />
         <FloatingChatbot />

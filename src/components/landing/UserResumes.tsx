@@ -10,7 +10,7 @@ import UpgradeModal from '@/components/shared/UpgradeModal';
 
 export default function UserResumes() {
   const { userResumes, fetchUserResumes, isLoading: resumesLoading, deleteResume, duplicateResume } = useResumeStore();
-  const { isPremium, status, fetchSubscription } = useSubscriptionStore();
+  const { isPremium, status, fetchSubscription, getPlanTier } = useSubscriptionStore();
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState("");
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -22,17 +22,23 @@ export default function UserResumes() {
   }, [fetchUserResumes, fetchSubscription]);
 
   const handleCreateNew = (e: React.MouseEvent) => {
-    if (!isPremium() && userResumes.length >= 2) {
+    const tier = getPlanTier();
+    const maxResumes = tier === 'enterprise' ? Infinity : (tier === 'pro' ? 5 : 1);
+    
+    if (userResumes.length >= maxResumes) {
       e.preventDefault();
-      setUpgradeReason("You've reached the limit of 2 resumes on the Free plan. Upgrade to Premium for unlimited resumes!");
+      setUpgradeReason(`You've reached the limit of ${maxResumes} resume${maxResumes === 1 ? '' : 's'} on the ${tier === 'free' ? 'Free' : 'Pro'} plan. Upgrade to continue!`);
       setIsUpgradeModalOpen(true);
     }
   };
 
   const handleDuplicate = async (e: React.MouseEvent, id: string, title: string) => {
     e.preventDefault();
-    if (!isPremium() && userResumes.length >= 2) {
-      setUpgradeReason("You've reached the limit of 2 resumes on the Free plan. Upgrade to Premium for unlimited resumes!");
+    const tier = getPlanTier();
+    const maxResumes = tier === 'enterprise' ? Infinity : (tier === 'pro' ? 5 : 1);
+
+    if (userResumes.length >= maxResumes) {
+      setUpgradeReason(`You've reached the limit of ${maxResumes} resume${maxResumes === 1 ? '' : 's'} on the ${tier === 'free' ? 'Free' : 'Pro'} plan. Upgrade to continue!`);
       setIsUpgradeModalOpen(true);
       return;
     }

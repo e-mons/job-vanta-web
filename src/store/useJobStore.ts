@@ -92,7 +92,7 @@ export const useJobStore = create<JobState>()((set, get) => ({
     set({ isLoading: true, error: null, searchQuery: query, locationFilter: location || "" });
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
 
       const res = await fetch(`/api/jobs/search`, {
         method: "POST",
@@ -134,7 +134,7 @@ export const useJobStore = create<JobState>()((set, get) => ({
     set({ isLoading: true, error: null, hasSearched: true });
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const timeoutId = setTimeout(() => controller.abort(), 45000); // Increased timeout to allow for cascading API fallbacks
 
       const res = await fetch(`/api/jobs/search`, {
         method: "POST",

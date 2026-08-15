@@ -77,7 +77,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   getPlanTier: () => {
     const { status, planId } = get();
     if (status !== 'active' && status !== 'trialing') return 'free';
-    const plan = PLANS.find((p) => p.priceId === planId);
+    const plan = PLANS.find((p) => p.priceId === planId || p.id === planId);
     return (plan?.id as 'pro' | 'enterprise') || 'free';
   },
 

@@ -43,12 +43,13 @@ interface JobCardProps {
   onApplyNow?: () => void;
   isLocked?: boolean;
   onUpgradeClick?: () => void;
+  matchSkills?: string[];
 }
 
-export default function JobCard({ job, index, onApply, onApplyNow, isLocked, onUpgradeClick }: JobCardProps) {
+export default function JobCard({ job, index, onApply, onApplyNow, isLocked, onUpgradeClick, matchSkills }: JobCardProps) {
   const { saveJob, unsaveJob, savedJobs, savedJobIds } = useJobStore();
   const { isPremium } = useSubscriptionStore();
-  const resumeSkills = useResumeStore((s) => s.data.skills);
+  const globalResumeSkills = useResumeStore((s) => s.data.skills);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [isTogglingSave, setIsTogglingSave] = useState(false);
 
@@ -58,11 +59,12 @@ export default function JobCard({ job, index, onApply, onApplyNow, isLocked, onU
   
   // Simple heuristic for match if we don't have server-side score
   const matchPercent = useMemo(() => {
-    if (!job.skills?.length || !resumeSkills?.length) return 0;
-    const resumeSet = new Set(resumeSkills.map(s => s.toLowerCase().trim()));
+    const skillsToMatch = matchSkills || globalResumeSkills;
+    if (!job.skills?.length || !skillsToMatch?.length) return 0;
+    const resumeSet = new Set(skillsToMatch.map(s => s.toLowerCase().trim()));
     const matches = job.skills.filter(s => resumeSet.has(s.toLowerCase().trim()));
     return Math.round((matches.length / job.skills.length) * 100);
-  }, [job.skills, resumeSkills]);
+  }, [job.skills, globalResumeSkills, matchSkills]);
 
   const handleToggleSave = async (e: React.MouseEvent) => {
     e.stopPropagation();

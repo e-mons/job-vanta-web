@@ -365,10 +365,10 @@ export const useResumeStore = create<ResumeState>()(
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("Not authenticated");
 
-            const isPremium = useSubscriptionStore.getState().isPremium();
-            const { userResumes } = get();
-            if (!isPremium && userResumes.length >= 2) {
-              throw new Error("Limit reached. Upgrade to Premium for unlimited resumes.");
+            const planTier = useSubscriptionStore.getState().getPlanTier();
+            const maxResumes = planTier === 'enterprise' ? Infinity : (planTier === 'pro' ? 5 : 1);
+            if (get().userResumes.length >= maxResumes) {
+              throw new Error("PLAN_LIMIT_REACHED");
             }
 
             const normalizedData = normalizeResumeData(data);
@@ -439,9 +439,10 @@ export const useResumeStore = create<ResumeState>()(
             const sourceResume = state.userResumes.find(r => r.id === id);
             if (!sourceResume) throw new Error("Source resume not found");
 
-            const isPremium = useSubscriptionStore.getState().isPremium();
-            if (!isPremium && state.userResumes.length >= 2) {
-              throw new Error("Limit reached. Upgrade to Premium for unlimited resumes.");
+            const planTier = useSubscriptionStore.getState().getPlanTier();
+            const maxResumes = planTier === 'enterprise' ? Infinity : (planTier === 'pro' ? 5 : 1);
+            if (state.userResumes.length >= maxResumes) {
+              throw new Error("PLAN_LIMIT_REACHED");
             }
 
             const { data: newResume, error } = await supabase

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
@@ -8,12 +9,15 @@ export const maxDuration = 60;
 const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
 const ai = new GoogleGenAI({ apiKey });
 
-// In-Memory Search Cache (30 Min TTL)
+// In-Memory Search Cache (1 Min TTL)
 const searchCache = new Map<string, { timestamp: number; jobs: any[]; queryStr: string }>();
-const CACHE_TTL_MS = 30 * 60 * 1000;
+const CACHE_TTL_MS = 60 * 1000;
 
 // Verified active models (tested 2026-07-29)
 const MODELS = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"];
+
+const rapidApiKey = process.env.RAPIDAPI_KEY?.trim() || "";
+const openWebNinjaKey = process.env.OPENWEBNINJA_KEY?.trim() || "";
 
 // Job Schema
 const JobSchema = z.object({
@@ -64,6 +68,104 @@ async function callGemini(prompt: string): Promise<string> {
 }
 
 /**
+ * Fetch real jobs using JSearch API (RapidAPI)
+ */
+async function fetchRealJobs(query: string, location: string, isRemote: boolean = false): Promise<any[]> {
+  if (!openWebNinjaKey && !rapidApiKey) return [];
+  
+  const searchStr = `${query} in ${location} ${isRemote ? 'remote' : ''}`.trim();
+  
+  const isDirect = !!openWebNinjaKey;
+  const url = isDirect 
+    ? `https://api.openwebninja.com/jsearch/search-v2?query=${encodeURIComponent(searchStr)}&page=1&num_pages=1`
+    : `https://jsearch.p.rapidapi.com/search?query=${encodeURIComponent(searchStr)}&page=1&num_pages=1`;
+  
+  const headers: any = isDirect 
+    ? { 'x-api-key': openWebNinjaKey }
+    : {
+        'X-RapidAPI-Key': rapidApiKey,
+        'X-RapidAPI-Host': 'jsearch.p.rapidapi.com'
+      };
+  
+  try {
+    const res = await fetch(url, { headers });
+    
+    if (!res.ok) throw new Error(`JSearch API error: ${res.status}`);
+    
+    const json = await res.json();
+    const jobsArray = Array.isArray(json.data) ? json.data : (json.data?.jobs || []);
+    if (!Array.isArray(jobsArray) || jobsArray.length === 0) return [];
+    
+    return jobsArray.map((job: any) => {
+      return {
+        id: job.job_id || uuidv4(),
+        title: job.job_title || "Unknown Title",
+        company: job.employer_name || "Unknown Company",
+        companyLogo: job.employer_logo || `https://icon.horse/icon/${job.employer_website?.replace(new RegExp('^https?://'), '') || 'company.com'}`,
+        companyDescription: null,
+        location: `${job.job_city || ''}, ${job.job_state || ''}, ${job.job_country || ''}`.replace(/^, | ,|, $/g, '').trim() || location,
+        isRemote: job.job_is_remote || isRemote,
+        salary: job.job_min_salary ? `$${job.job_min_salary}k - $${job.job_max_salary}k` : null,
+        contactEmail: null,
+        applyLink: job.apply_options?.find((o: any) => o.is_direct)?.apply_link || job.job_apply_link || job.job_google_link || "https://google.com",
+        description: job.job_description || "No description provided.",
+        type: job.job_employment_type || "Full-time",
+        employmentType: job.job_employment_type || "Full-time",
+        source: "JSearch Verified",
+        postedAt: job.job_posted_at_datetime_utc || new Date().toISOString(),
+        skills: [], // We can't perfectly extract these yet without LLM
+        responsibilities: [],
+        qualifications: [],
+        benefits: []
+      };
+    });
+  } catch (err: any) {
+    console.error("[JobSearch] RapidAPI fetch failed:", err.message);
+    return [];
+  }
+}
+
+/**
+ * Fetch real remote tech jobs from Remotive API as a reliable fallback
+ */
+async function fetchRemotiveJobs(query: string): Promise<any[]> {
+  try {
+    const searchStr = query.split(' ')[0] || "software"; // Remotive search is best with single keyword
+    const url = `https://remotive.com/api/remote-jobs?search=${encodeURIComponent(searchStr)}&limit=15`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Remotive API error: ${res.status}`);
+    const json = await res.json();
+    
+    if (!json.jobs || !Array.isArray(json.jobs)) return [];
+    
+    return json.jobs.map((job: any) => ({
+      id: `remotive-${job.id || uuidv4()}`,
+      title: job.title || "Unknown Title",
+      company: job.company_name || "Unknown Company",
+      companyLogo: job.company_logo || `https://icon.horse/icon/${job.company_name?.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'company'}.com`,
+      companyDescription: null,
+      location: job.candidate_required_location || "Remote Worldwide",
+      isRemote: true,
+      salary: job.salary || null,
+      contactEmail: null,
+      applyLink: job.url || "https://remotive.com",
+      description: job.description || "No description provided.",
+      type: job.job_type ? job.job_type.replace('_', '-') : "Full-time",
+      employmentType: job.job_type ? job.job_type.replace('_', '-') : "Full-time",
+      source: "Remotive Verified",
+      postedAt: job.publication_date || new Date().toISOString(),
+      skills: job.tags || [],
+      responsibilities: [],
+      qualifications: [],
+      benefits: []
+    }));
+  } catch (err: any) {
+    console.error("[JobSearch] Remotive fetch failed:", err.message);
+    return [];
+  }
+}
+
+/**
  * Resolve target location from filters, body params, or Vercel/CF geo headers
  */
 function resolveTargetLocation(
@@ -99,7 +201,7 @@ function generateFallbackJobs(
   const isRemoteOnly = !!filters?.isRemote;
   const activeLocation = isRemoteOnly ? "100% Remote" : targetLoc;
 
-  const topTechCompanies = [
+  const baseCompanies = [
     { name: "Stripe", domain: "stripe.com", bg: "Fintech infrastructure platform for internet payments." },
     { name: "Vercel", domain: "vercel.com", bg: "Frontend cloud platform for Next.js and web applications." },
     { name: "Supabase", domain: "supabase.com", bg: "Open-source Firebase alternative powered by Postgres." },
@@ -113,6 +215,8 @@ function generateFallbackJobs(
     { name: "Notion", domain: "notion.so", bg: "Connected workspace for docs, wikis, and project management." },
     { name: "Postman", domain: "postman.com", bg: "API platform for building, testing, and managing APIs." },
   ];
+
+  const topTechCompanies = [...baseCompanies].sort(() => Math.random() - 0.5);
 
   const now = new Date();
 
@@ -197,6 +301,7 @@ export async function POST(req: NextRequest) {
       location: targetLocation,
       skills: sortedSkills,
       filters: filters || {},
+      realJobsOnly: true
     });
 
     if (searchCache.has(cacheKey)) {
@@ -213,94 +318,82 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Build prompt
-    const searchContext =
-      sortedSkills.length > 0
-        ? `Generate jobs matching a candidate with these skills: ${sortedSkills.join(", ")}.`
-        : `Search Query: "${query || "Software Engineer"}"`;
-
-    const todayISO = new Date().toISOString();
-
-    const prompt = `
-You are the AI Search Engine for JobVanta. Generate 12 realistic, active job postings based on:
-${searchContext}
-
-CRITICAL GEOGRAPHIC & LOCATION INSTRUCTION:
-- Target Candidate Location: "${targetLocation}".
-- The FIRST 8 jobs in the returned JSON MUST be active openings located specifically in/near "${targetLocation}" (or local hybrid/remote positions based in "${targetLocation}"), with realistic market salaries.
-- Do NOT default to American cities (like San Francisco or New York) UNLESS "${targetLocation}" is explicitly located in the United States.
-- The remaining 4 jobs should be 100% Remote global roles open to candidates in "${targetLocation}".
-
-RULES:
-- Today is ${todayISO}. "postedAt" must be within last 1 to 4 days.
-- Use real company names (e.g. Stripe, Vercel, Linear, Airbnb, Supabase, Figma, Datadog) and matching logos (https://icon.horse/icon/{domain}).
-- Provide real contact emails (careers@company.com) and apply links.
-
-Return ONLY a raw JSON array of 12 objects matching this structure EXACTLY (no markdown, no backticks):
-[
-  {
-    "id": "${uuidv4()}",
-    "title": "Job Title",
-    "company": "Company Name",
-    "companyLogo": "https://icon.horse/icon/company.com",
-    "companyDescription": "Brief description",
-    "location": "${targetLocation}",
-    "isRemote": true,
-    "salary": "$120k - $160k",
-    "contactEmail": "careers@company.com",
-    "applyLink": "https://company.com/careers",
-    "description": "Full job description...",
-    "type": "Full-time",
-    "employmentType": "Full-time",
-    "source": "JobVanta Direct Verified",
-    "postedAt": "${todayISO}",
-    "skills": ["Skill 1", "Skill 2"],
-    "responsibilities": ["Resp 1", "Resp 2"],
-    "qualifications": ["Qual 1", "Qual 2"],
-    "benefits": ["Benefit 1", "Benefit 2"]
-  }
-]`;
-
-    const displayQuery = query || (sortedSkills.length > 0 ? sortedSkills.join(", ") : "Jobs");
+    // JSearch queries fail if they are too long/specific.
+    // Start with a reasonable base query: User's typed query, OR top 2 skills, OR generic "Jobs"
+    const displayQuery = query || (sortedSkills.length > 0 ? sortedSkills.slice(0, 2).join(" ") : "Jobs");
     let validatedJobs: any[] = [];
 
-    try {
-      // 45-second hard timeout for AI call
-      const aiPromise = callGemini(prompt);
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("AI timeout")), 45000)
-      );
-
-      const content = await Promise.race([aiPromise, timeoutPromise]);
-
-      // Extract JSON array from response
-      let cleaned = content.trim();
-      cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
-      const startIdx = cleaned.indexOf("[");
-      const endIdx = cleaned.lastIndexOf("]");
-      if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-        cleaned = cleaned.substring(startIdx, endIdx + 1);
+    // Prioritize REAL jobs via RapidAPI JSearch
+    console.log(`[JobSearch] Fetching real jobs for "${displayQuery}" in "${targetLocation}"`);
+    
+    if (openWebNinjaKey || rapidApiKey) {
+      let searchLoc = targetLocation;
+      if (searchLoc === "Local Tech Hub (Nearest)") searchLoc = "";
+      
+      // 1. Initial Strict Search (Location + Top 2 Skills)
+      let realJobs = await fetchRealJobs(displayQuery, searchLoc, filters?.isRemote);
+      
+      // 2. Broad Search (Country/Remote + Top Skill)
+      if (!realJobs || realJobs.length === 0) {
+        let broaderLocation = "Remote";
+        if (searchLoc.includes(',')) broaderLocation = searchLoc.split(',').pop()?.trim() || "Remote";
+        
+        const broaderQuery = sortedSkills.length > 0 ? sortedSkills[0] : displayQuery;
+        
+        console.log(`[JobSearch] Broadening search to: "${broaderQuery}" in "${broaderLocation}"`);
+        realJobs = await fetchRealJobs(broaderQuery, broaderLocation, filters?.isRemote);
       }
 
-      const parsed = JSON.parse(cleaned);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        validatedJobs = parsed.map((j) => {
-          try { return JobSchema.parse(j); } catch { return j; }
-        }).filter(Boolean);
+      // 3. The Ultimate Global Fallback
+      if (!realJobs || realJobs.length === 0) {
+        console.log(`[JobSearch] Still no matches. Searching for generic "Software" globally`);
+        realJobs = await fetchRealJobs(query || "Software", "", false);
       }
-    } catch (aiErr: any) {
-      console.warn(`[JobSearch] AI failed (${aiErr.message}), using fallback jobs for: ${targetLocation}`);
+
+      if (realJobs && realJobs.length > 0) {
+        validatedJobs = realJobs;
+      } else {
+        console.warn(`[JobSearch] JSearch returned 0 results even after expanding location and query.`);
+      }
+    } else {
+      console.warn("[JobSearch] No RAPIDAPI_KEY configured. Cannot fetch real jobs.");
     }
 
-    // Fallback if AI returned nothing
-    if (!validatedJobs || validatedJobs.length === 0) {
-      validatedJobs = generateFallbackJobs(sortedSkills, query, location, filters, targetLocation);
+    // 4. Reliable Remotive API Fallback
+    if (validatedJobs.length === 0) {
+      console.log(`[JobSearch] JSearch failed or empty. Falling back to Remotive API for "${displayQuery}"`);
+      validatedJobs = await fetchRemotiveJobs(displayQuery);
+    }
+
+    // Apply Pricing Plan Limits
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    let maxJobs = 6; // Free plan limit
+    if (user) {
+      const { data: sub } = await supabase
+        .from('subscriptions')
+        .select('plan_id, status')
+        .eq('user_id', user.id)
+        .single();
+        
+      if (sub && (sub.status === 'active' || sub.status === 'trialing')) {
+        if (sub.plan_id === 'enterprise' || sub.plan_id === 'pdt_0NewgKeXYMkBEofXpxy9Z') {
+          maxJobs = Infinity;
+        } else if (sub.plan_id === 'pro' || sub.plan_id === 'pdt_0Newfu26VwAPCKJBoT8z5') {
+          maxJobs = 18;
+        }
+      }
+    }
+    
+    // Slice jobs according to plan limit
+    if (maxJobs !== Infinity) {
+      validatedJobs = validatedJobs.slice(0, maxJobs);
     }
 
     // Save to cache
     searchCache.set(cacheKey, {
       timestamp: Date.now(),
-      jobs: validatedJobs,
+      jobs: validatedJobs, // Caching the sliced array so free users don't get full array on reload
       queryStr: displayQuery,
     });
 
@@ -313,12 +406,10 @@ Return ONLY a raw JSON array of 12 objects matching this structure EXACTLY (no m
 
   } catch (error: any) {
     console.error("[JobSearch] Endpoint error:", error.message);
-    // Always return JSON — never let Next.js render an HTML error page
-    const fallbackJobs = generateFallbackJobs([], "", "", {}, "Nearest Tech Hub");
     return NextResponse.json({
-      success: true,
-      jobs: fallbackJobs,
-      query: "Matching Opportunities",
+      success: false,
+      jobs: [],
+      error: error.message || "An error occurred while fetching real jobs."
     });
   }
 }

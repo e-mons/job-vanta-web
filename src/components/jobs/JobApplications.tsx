@@ -26,12 +26,6 @@ interface Application {
   resumes: {
     title: string;
   };
-  application_emails: {
-    id: string;
-    subject: string;
-    body: string;
-    created_at: string;
-  }[];
 }
 
 export default function JobApplications() {
@@ -50,8 +44,7 @@ export default function JobApplications() {
         .from("job_applications")
         .select(`
           *,
-          resumes (title),
-          application_emails (*)
+          resumes (title)
         `)
         .order("created_at", { ascending: false });
 
@@ -197,37 +190,6 @@ export default function JobApplications() {
                     </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Email History */}
-              <div>
-                <h3 className="flex items-center gap-3 text-xl font-bold text-slate-900 mb-6">
-                  <Mail className="w-6 h-6 text-blue-600" />
-                  Communication History
-                </h3>
-                
-                {selectedApp.application_emails.length > 0 ? (
-                  <div className="space-y-6">
-                    {selectedApp.application_emails.map((email) => (
-                      <div key={email.id} className="p-6 rounded-[32px] bg-slate-50 border border-slate-100">
-                        <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200/60">
-                          <h4 className="font-bold text-slate-900">{email.subject}</h4>
-                          <span className="text-[10px] text-slate-400 font-bold">
-                            {format(new Date(email.created_at), "MMM d, HH:mm")}
-                          </span>
-                        </div>
-                        <div className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap font-medium">
-                          {email.body}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 rounded-[32px] bg-slate-50 border border-dashed border-slate-200">
-                    <Mail className="w-10 h-10 text-slate-300 mx-auto mb-4" />
-                    <p className="text-slate-500 font-medium">No emails generated yet.</p>
-                  </div>
-                )}
               </div>
             </motion.div>
           ) : (

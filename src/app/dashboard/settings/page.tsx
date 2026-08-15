@@ -31,7 +31,7 @@ export default function SettingsPage() {
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const { status: subStatus, planId, currentPeriodEnd, fetchSubscription } = useSubscriptionStore();
+  const { status: subStatus, planId, currentPeriodEnd, fetchSubscription, getPlanTier } = useSubscriptionStore();
   const router = useRouter();
 
   // Form states
@@ -271,15 +271,10 @@ export default function SettingsPage() {
                         <h2 className="text-2xl font-black text-slate-900 tracking-tight">{profileForm.fullName || user?.email?.split('@')[0]}</h2>
                         <p className="text-slate-500 font-medium mb-4">{user?.email}</p>
                         <div className="flex flex-wrap justify-center md:justify-start gap-3">
-                          {subStatus === 'active' || subStatus === 'trialing' ? (
-                            <span className="px-4 py-1.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-wider border border-blue-100 flex items-center gap-2">
-                              <Star className="w-3 h-3 fill-blue-600" /> Premium Member
-                            </span>
-                          ) : (
-                            <span className="px-4 py-1.5 rounded-full bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-wider border border-slate-100 flex items-center gap-2">
-                              Free Plan
-                            </span>
-                          )}
+                          <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border flex items-center gap-2 ${getPlanTier() === 'free' ? 'bg-slate-50 text-slate-500 border-slate-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                            {getPlanTier() !== 'free' && <Star className="w-3 h-3 fill-blue-600" />}
+                            {PLANS.find(p => p.id === getPlanTier())?.name} Plan
+                          </span>
                           <span className="px-4 py-1.5 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-wider border border-emerald-100 flex items-center gap-2">
                             <CheckCircle2 className="w-3 h-3" /> Verified Account
                           </span>
@@ -382,7 +377,7 @@ export default function SettingsPage() {
                         <div>
                           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-400 leading-tight">Current Plan</p>
                           <h2 className="text-3xl font-black tracking-tight leading-tight">
-                            {subStatus === 'none' ? 'Free Plan' : (PLANS.find(p => p.priceId === planId)?.name || 'Pro') + ' Plan'}
+                            {PLANS.find(p => p.id === getPlanTier())?.name} Plan
                           </h2>
                         </div>
                       </div>
@@ -391,7 +386,7 @@ export default function SettingsPage() {
                          {[
                           { label: 'Status', value: subStatus === 'none' ? 'FREE' : subStatus?.toUpperCase(), color: subStatus === 'none' ? 'text-slate-400' : 'text-emerald-400' },
                           { label: 'Next Billing', value: currentPeriodEnd ? new Date(currentPeriodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '—', color: 'text-white' },
-                          { label: 'Amount', value: subStatus === 'none' ? '$0.00' : `$${PLANS.find(p => p.priceId === planId)?.price || '29'}.00 / mo`, color: 'text-white' },
+                          { label: 'Amount', value: getPlanTier() === 'free' ? '$0.00' : `$${PLANS.find(p => p.id === getPlanTier())?.price || '29'}.00 / mo`, color: 'text-white' },
                         ].map((stat, i) => (
                           <div key={i} className="p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-sm">
                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">{stat.label}</p>
@@ -429,20 +424,7 @@ export default function SettingsPage() {
                   <div className="p-10 rounded-[3rem] bg-white border border-slate-200/60 shadow-2xl shadow-slate-200/50">
                     <h3 className="text-xl font-black text-slate-900 mb-8 tracking-tight">Plan Features</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {(subStatus === 'none' ? [
-                        'ATS-Friendly Resume Builder',
-                        'Limited AI Suggestions',
-                        'Job Search & Matching',
-                        '3 Saved Resumes',
-                        'Basic Support'
-                      ] : [
-                        'Unlimited AI Resume Tailoring',
-                        'Real-time ATS Score Analysis',
-                        'Unlimited PDF Downloads',
-                        'AI Cover Letter Generation',
-                        'Priority Customer Support',
-                        'Advanced Career Roadmap AI',
-                      ]).map((feature, i) => (
+                      {(PLANS.find(p => p.id === getPlanTier())?.features || []).map((feature, i) => (
                         <div key={i} className="flex items-center gap-3">
                           <div className="w-6 h-6 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
                             <CheckCircle2 className="w-4 h-4 text-emerald-500" />

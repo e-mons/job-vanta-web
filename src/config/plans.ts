@@ -28,8 +28,8 @@ export const PLANS: Plan[] = [
     features: [
       '1 Resume CV',
       '6 Job Search Results',
+      'No Job Details Access',
       'No Job Applications',
-      'Basic AI Suggestions',
       'Basic Support'
     ],
     cta: 'Start for Free',
@@ -46,10 +46,10 @@ export const PLANS: Plan[] = [
     features: [
       '5 Resume CVs',
       '18 Job Search Results',
+      'View Job Details',
       'Full Job Applications',
       'Unlimited AI Resume Optimization',
-      'Priority Email Support',
-      'Advanced Career Insights'
+      'Priority Email Support'
     ],
     cta: 'Get Started Pro',
     href: '/signup?plan=pro',
@@ -65,10 +65,10 @@ export const PLANS: Plan[] = [
     features: [
       'Unlimited Resumes',
       'Unlimited Job Searches',
+      'View Job Details',
       'Full Job Applications',
       'Dedicated Career Coach (AI)',
-      'Portfolio Website Builder',
-      'Direct Recruiter Network'
+      'Portfolio Website Builder'
     ],
     cta: 'Go Enterprise',
     href: '/signup?plan=enterprise',
