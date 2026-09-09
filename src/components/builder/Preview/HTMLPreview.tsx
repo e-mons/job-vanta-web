@@ -185,6 +185,43 @@ const ModernTemplate = ({ data }: { data: ResumeData }) => (
             </div>
           </section>
         )}
+        {data.projects && data.projects.length > 0 && (
+          <section>
+            <h2 className="text-xl font-bold text-[#1f375b] uppercase tracking-widest border-b-2 border-[#1f375b] pb-2 mb-6">Key Projects</h2>
+            <div className="space-y-4">
+              {data.projects.map((proj) => (
+                <div key={proj.id}>
+                  <div className="flex justify-between items-baseline mb-1">
+                    <h3 className="text-base font-bold text-slate-900">{proj.name}</h3>
+                    {proj.link && <span className="text-xs text-blue-600 truncate max-w-[200px]">{proj.link}</span>}
+                  </div>
+                  {proj.description && <p className="text-sm text-slate-700 leading-relaxed mb-1">{proj.description}</p>}
+                  {proj.technologies && proj.technologies.length > 0 && (
+                    <div className="text-xs font-bold text-slate-500">
+                      Technologies: {Array.isArray(proj.technologies) ? proj.technologies.join(', ') : proj.technologies}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+        {data.certifications && data.certifications.length > 0 && (
+          <section>
+            <h2 className="text-xl font-bold text-[#1f375b] uppercase tracking-widest border-b-2 border-[#1f375b] pb-2 mb-6">Certifications</h2>
+            <div className="space-y-3">
+              {data.certifications.map((cert) => (
+                <div key={cert.id} className="flex justify-between items-baseline">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">{cert.name}</h3>
+                    <div className="text-sm text-slate-700">{cert.issuer}</div>
+                  </div>
+                  <span className="text-sm text-slate-600">{cert.date}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </main>
   </div>
@@ -239,6 +276,38 @@ const ExecutiveTemplate = ({ data }: { data: ResumeData }) => (
               <li key={i} className="text-sm text-slate-800 flex gap-3">
                  <span className="text-[#c6a365] mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full bg-[#c6a365]" />
                  <span className="font-bold">{edu.degree} | {edu.school} | {edu.year}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {data.projects && data.projects.length > 0 && (
+        <section>
+          <h2 className="text-xl font-bold text-[#0f2847] uppercase tracking-widest border-b border-[#c6a365] pb-1 mb-4">Key Projects</h2>
+          <div className="space-y-4 pl-4">
+            {data.projects.map((proj) => (
+              <div key={proj.id}>
+                <div className="text-base font-bold text-slate-900">{proj.name}</div>
+                {proj.description && <p className="text-sm text-slate-800 font-medium leading-relaxed mb-1">{proj.description}</p>}
+                {proj.technologies && proj.technologies.length > 0 && (
+                  <div className="text-xs font-semibold text-[#4c72a8]">
+                    Technologies: {Array.isArray(proj.technologies) ? proj.technologies.join(', ') : proj.technologies}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+      {data.certifications && data.certifications.length > 0 && (
+        <section>
+          <h2 className="text-xl font-bold text-[#0f2847] uppercase tracking-widest border-b border-[#c6a365] pb-1 mb-4">Certifications</h2>
+          <ul className="space-y-1.5 pl-4">
+            {data.certifications.map((cert, i) => (
+              <li key={i} className="text-sm text-slate-800 flex gap-3">
+                <span className="text-[#c6a365] mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full bg-[#c6a365]" />
+                <span className="font-bold">{cert.name}</span>
+                <span className="text-slate-600">— {cert.issuer} {cert.date ? `(${cert.date})` : ''}</span>
               </li>
             ))}
           </ul>
@@ -327,6 +396,46 @@ const CreativeTemplate = ({ data }: { data: ResumeData }) => (
           </div>
         </section>
       )}
+      {data.projects && data.projects.length > 0 && (
+        <section>
+          <h2 className="text-xl font-bold text-[#00427a] uppercase tracking-widest border-b border-[#00427a] pb-2 mb-6">
+            Key Projects
+          </h2>
+          <div className="relative border-l-2 border-[#00427a] ml-3 pl-6 space-y-6">
+            {data.projects.map(proj => (
+              <div key={proj.id} className="relative">
+                <div className="absolute w-4 h-4 bg-[#00427a] rounded-full -left-[33px] top-1" />
+                <h3 className="text-base font-bold text-slate-900">{proj.name}</h3>
+                {proj.description && <p className="text-sm text-slate-700 mt-1">{proj.description}</p>}
+                {proj.technologies && proj.technologies.length > 0 && (
+                  <div className="text-xs font-semibold text-[#00427a] mt-1">
+                    Tools: {Array.isArray(proj.technologies) ? proj.technologies.join(', ') : proj.technologies}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+      {data.certifications && data.certifications.length > 0 && (
+        <section>
+          <h2 className="text-xl font-bold text-[#00427a] uppercase tracking-widest border-b border-[#00427a] pb-2 mb-6 flex items-center gap-3">
+            <Award className="w-6 h-6" /> Certifications
+          </h2>
+          <div className="relative border-l-2 border-[#00427a] ml-3 pl-6 space-y-4">
+            {data.certifications.map(cert => (
+              <div key={cert.id} className="relative flex justify-between items-start">
+                <div className="absolute w-4 h-4 bg-[#00427a] rounded-full -left-[33px] top-1" />
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">{cert.name}</h3>
+                  <div className="text-sm text-slate-600">{cert.issuer}</div>
+                </div>
+                <div className="text-sm font-medium text-slate-600">{cert.date}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   </div>
 );
@@ -387,6 +496,43 @@ const MinimalistTemplate = ({ data }: { data: ResumeData }) => (
           </p>
         </section>
       )}
+      {data.projects && data.projects.length > 0 && (
+        <section>
+          <h2 className="text-lg font-bold text-[#1f2937] uppercase tracking-widest mb-6">Projects</h2>
+          <div className="space-y-4">
+            {data.projects.map((proj) => (
+              <div key={proj.id}>
+                <div className="flex justify-between items-baseline">
+                  <h3 className="text-base font-bold text-slate-900">{proj.name}</h3>
+                  {proj.link && <span className="text-xs text-blue-600 truncate max-w-[250px]">{proj.link}</span>}
+                </div>
+                {proj.description && <p className="text-sm text-slate-700 leading-relaxed mb-1">{proj.description}</p>}
+                {proj.technologies && proj.technologies.length > 0 && (
+                  <div className="text-xs text-slate-500 font-medium">
+                    Technologies: {Array.isArray(proj.technologies) ? proj.technologies.join(', ') : proj.technologies}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+      {data.certifications && data.certifications.length > 0 && (
+        <section>
+          <h2 className="text-lg font-bold text-[#1f2937] uppercase tracking-widest mb-6">Certifications</h2>
+          <div className="space-y-3">
+            {data.certifications.map((cert) => (
+              <div key={cert.id} className="flex justify-between items-baseline">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">{cert.name}</h3>
+                  <div className="text-sm text-slate-600">{cert.issuer}</div>
+                </div>
+                <span className="text-sm text-slate-600">{cert.date}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   </div>
 );
@@ -441,6 +587,43 @@ const CorporateTemplate = ({ data }: { data: ResumeData }) => (
                 <div key={edu.id}>
                   <div className="text-base font-bold text-slate-900">{edu.degree}</div>
                   <div className="text-sm text-slate-700 italic">{edu.school} | {edu.year}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+        {data.projects && data.projects.length > 0 && (
+          <section>
+            <h2 className="text-xl font-bold text-[#1e293b] uppercase tracking-widest border-b border-[#1e293b] pb-1 mb-6">Key Projects</h2>
+            <div className="space-y-4">
+              {data.projects.map((proj) => (
+                <div key={proj.id}>
+                  <div className="flex justify-between items-baseline mb-1">
+                    <h3 className="text-base font-bold text-slate-900">{proj.name}</h3>
+                    {proj.link && <span className="text-xs text-blue-600 truncate max-w-[200px]">{proj.link}</span>}
+                  </div>
+                  {proj.description && <p className="text-sm text-slate-700 leading-relaxed mb-1">{proj.description}</p>}
+                  {proj.technologies && proj.technologies.length > 0 && (
+                    <div className="text-xs font-bold text-slate-500">
+                      Technologies: {Array.isArray(proj.technologies) ? proj.technologies.join(', ') : proj.technologies}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+        {data.certifications && data.certifications.length > 0 && (
+          <section>
+            <h2 className="text-xl font-bold text-[#1e293b] uppercase tracking-widest border-b border-[#1e293b] pb-1 mb-6">Certifications</h2>
+            <div className="space-y-3">
+              {data.certifications.map((cert) => (
+                <div key={cert.id} className="flex justify-between items-baseline">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">{cert.name}</h3>
+                    <div className="text-sm text-slate-700">{cert.issuer}</div>
+                  </div>
+                  <span className="text-sm text-slate-600">{cert.date}</span>
                 </div>
               ))}
             </div>
@@ -515,6 +698,43 @@ const TechProTemplate = ({ data }: { data: ResumeData }) => (
           </div>
         </section>
       )}
+      {data.projects && data.projects.length > 0 && (
+        <section>
+          <h2 className="text-xl font-bold text-slate-900 uppercase tracking-widest mb-6">Key Projects</h2>
+          <div className="space-y-4">
+            {data.projects.map((proj) => (
+              <div key={proj.id}>
+                <div className="flex justify-between items-baseline mb-1">
+                  <h3 className="text-base font-bold text-slate-900">{proj.name}</h3>
+                  {proj.link && <span className="text-xs text-[#0096a6] truncate max-w-[200px]">{proj.link}</span>}
+                </div>
+                {proj.description && <p className="text-sm text-slate-700 leading-relaxed mb-1">{proj.description}</p>}
+                {proj.technologies && proj.technologies.length > 0 && (
+                  <div className="text-xs font-bold text-[#0096a6]">
+                    Technologies: {Array.isArray(proj.technologies) ? proj.technologies.join(', ') : proj.technologies}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+      {data.certifications && data.certifications.length > 0 && (
+        <section>
+          <h2 className="text-xl font-bold text-slate-900 uppercase tracking-widest mb-6">Certifications</h2>
+          <div className="space-y-3">
+            {data.certifications.map((cert) => (
+              <div key={cert.id} className="flex justify-between items-baseline">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">{cert.name}</h3>
+                  <div className="text-sm text-slate-700">{cert.issuer}</div>
+                </div>
+                <span className="text-sm text-slate-600">{cert.date}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       {data.skills.length > 0 && (
         <section>
           <h2 className="text-xl font-bold text-slate-900 uppercase tracking-widest mb-6">Technical Skills</h2>
@@ -571,6 +791,36 @@ const ElegantTemplate = ({ data }: { data: ResumeData }) => (
               {data.education.map((edu) => (
                 <div key={edu.id} className="text-sm font-bold text-slate-900">
                   {edu.degree} | <span className="font-normal text-slate-700">{edu.school}, {edu.year}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+        {data.projects && data.projects.length > 0 && (
+          <section>
+            <h2 className="text-center text-lg font-serif font-bold text-[#5a1f24] uppercase tracking-widest mb-4 border-y border-[#5a1f24] py-1">Key Projects</h2>
+            <div className="space-y-4">
+              {data.projects.map((proj) => (
+                <div key={proj.id}>
+                  <div className="text-sm font-bold text-slate-900">{proj.name}</div>
+                  {proj.description && <p className="text-sm text-slate-800 font-serif leading-relaxed mb-1">{proj.description}</p>}
+                  {proj.technologies && proj.technologies.length > 0 && (
+                    <div className="text-xs font-serif text-slate-500">
+                      Tools: {Array.isArray(proj.technologies) ? proj.technologies.join(', ') : proj.technologies}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+        {data.certifications && data.certifications.length > 0 && (
+          <section>
+            <h2 className="text-center text-lg font-serif font-bold text-[#5a1f24] uppercase tracking-widest mb-4 border-y border-[#5a1f24] py-1">Certifications</h2>
+            <div className="space-y-2">
+              {data.certifications.map((cert) => (
+                <div key={cert.id} className="text-sm font-serif text-slate-800">
+                  <span className="font-bold">{cert.name}</span> — {cert.issuer} {cert.date ? `(${cert.date})` : ''}
                 </div>
               ))}
             </div>
@@ -644,6 +894,43 @@ const BoldTemplate = ({ data }: { data: ResumeData }) => (
             </div>
           </section>
         )}
+        {data.projects && data.projects.length > 0 && (
+          <section>
+            <h2 className="text-xl font-black text-slate-900 uppercase mb-6">Key Projects</h2>
+            <div className="space-y-4">
+              {data.projects.map((proj) => (
+                <div key={proj.id}>
+                  <div className="flex justify-between items-baseline mb-1">
+                    <h3 className="text-base font-black text-slate-900 uppercase">{proj.name}</h3>
+                    {proj.link && <span className="text-xs text-[#ff7b00] truncate max-w-[200px]">{proj.link}</span>}
+                  </div>
+                  {proj.description && <p className="text-sm text-slate-700 leading-relaxed mb-1">{proj.description}</p>}
+                  {proj.technologies && proj.technologies.length > 0 && (
+                    <div className="text-xs font-bold text-[#ff7b00]">
+                      Tools: {Array.isArray(proj.technologies) ? proj.technologies.join(', ') : proj.technologies}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+        {data.certifications && data.certifications.length > 0 && (
+          <section>
+            <h2 className="text-xl font-black text-slate-900 uppercase mb-6">Certifications</h2>
+            <div className="space-y-3">
+              {data.certifications.map((cert) => (
+                <div key={cert.id} className="flex justify-between items-baseline">
+                  <div>
+                    <h3 className="text-base font-black text-slate-900 uppercase">{cert.name}</h3>
+                    <div className="text-sm text-slate-700">{cert.issuer}</div>
+                  </div>
+                  <span className="text-sm text-slate-600">{cert.date}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </main>
     </div>
   </div>
@@ -706,6 +993,47 @@ const CleanTemplate = ({ data }: { data: ResumeData }) => (
               <div key={edu.id} className="flex justify-between items-baseline">
                 <h3 className="text-base font-bold text-slate-900">{edu.degree}</h3>
                 <span className="text-sm text-slate-600">{edu.year}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+      {data.projects && data.projects.length > 0 && (
+        <section>
+          <h2 className="text-lg font-bold text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-3">
+             <span className="w-3 h-3 rounded-full bg-[#7bae6a]" /> Key Projects
+          </h2>
+          <div className="space-y-4">
+            {data.projects.map((proj) => (
+              <div key={proj.id}>
+                <div className="flex justify-between items-baseline mb-1">
+                  <h3 className="text-base font-bold text-slate-900">{proj.name}</h3>
+                  {proj.link && <span className="text-xs text-blue-600 truncate max-w-[200px]">{proj.link}</span>}
+                </div>
+                {proj.description && <p className="text-sm text-slate-700 leading-relaxed mb-1">{proj.description}</p>}
+                {proj.technologies && proj.technologies.length > 0 && (
+                  <div className="text-xs font-medium text-slate-500">
+                    Technologies: {Array.isArray(proj.technologies) ? proj.technologies.join(', ') : proj.technologies}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+      {data.certifications && data.certifications.length > 0 && (
+        <section>
+          <h2 className="text-lg font-bold text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-3">
+             <span className="w-3 h-3 rounded-full bg-[#7bae6a]" /> Certifications
+          </h2>
+          <div className="space-y-3">
+            {data.certifications.map((cert) => (
+              <div key={cert.id} className="flex justify-between items-baseline">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">{cert.name}</h3>
+                  <div className="text-sm text-slate-600">{cert.issuer}</div>
+                </div>
+                <span className="text-sm text-slate-600">{cert.date}</span>
               </div>
             ))}
           </div>
@@ -783,6 +1111,43 @@ const ProfessionalDarkTemplate = ({ data }: { data: ResumeData }) => (
                 <div key={edu.id}>
                   <h3 className="text-base font-bold text-slate-900">{edu.school}</h3>
                   <div className="text-sm text-slate-700">{edu.degree} | {edu.year}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+        {data.projects && data.projects.length > 0 && (
+          <section>
+            <h2 className="text-xl font-bold text-slate-900 uppercase tracking-widest mb-6">Key Projects</h2>
+            <div className="space-y-4">
+              {data.projects.map((proj) => (
+                <div key={proj.id}>
+                  <div className="flex justify-between items-baseline mb-1">
+                    <h3 className="text-base font-bold text-slate-900">{proj.name}</h3>
+                    {proj.link && <span className="text-xs text-[#50667c] truncate max-w-[200px]">{proj.link}</span>}
+                  </div>
+                  {proj.description && <p className="text-sm text-slate-700 leading-relaxed mb-1">{proj.description}</p>}
+                  {proj.technologies && proj.technologies.length > 0 && (
+                    <div className="text-xs font-bold text-[#50667c]">
+                      Technologies: {Array.isArray(proj.technologies) ? proj.technologies.join(', ') : proj.technologies}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+        {data.certifications && data.certifications.length > 0 && (
+          <section>
+            <h2 className="text-xl font-bold text-slate-900 uppercase tracking-widest mb-6">Certifications</h2>
+            <div className="space-y-3">
+              {data.certifications.map((cert) => (
+                <div key={cert.id} className="flex justify-between items-baseline">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">{cert.name}</h3>
+                    <div className="text-sm text-slate-700">{cert.issuer}</div>
+                  </div>
+                  <span className="text-sm text-slate-600">{cert.date}</span>
                 </div>
               ))}
             </div>

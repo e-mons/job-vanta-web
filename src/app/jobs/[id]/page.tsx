@@ -25,7 +25,9 @@ import {
   TrendingUp,
   Info,
   Mail,
-  AlertTriangle
+  AlertTriangle,
+  Heart,
+  Loader2
 } from "lucide-react";
 import { useJobStore } from "@/store/useJobStore";
 import { useResumeStore, UserResume } from "@/store/useResumeStore";
@@ -34,24 +36,46 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import MobileBottomNav from "@/components/navigation/MobileBottomNav";
 import CompanyLogo from "@/components/jobs/CompanyLogo";
 import { toast } from "sonner";
-import { Job } from "@/store/useJobStore";
 import { createClient } from "@/utils/supabase/client";
-import ExtensionPromoModal from "@/components/jobs/ExtensionPromoModal";
 import UpgradeModal from "@/components/shared/UpgradeModal";
+import ApplyModal from "@/components/jobs/ApplyModal";
 
 export default function JobDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const { id } = params;
-  const { selectedJob, savedJobIds, saveJob, fetchSavedJobs } = useJobStore();
+  const { selectedJob, savedJobIds, saveJob, unsaveJob, fetchSavedJobs } = useJobStore();
   const { userResumes, fetchUserResumes } = useResumeStore();
   const { isPremium, getPlanTier } = useSubscriptionStore();
   const planTier = getPlanTier();
   const [isSaving, setIsSaving] = useState(false);
+  const [isTogglingSave, setIsTogglingSave] = useState(false);
   const [selectedResume, setSelectedResume] = useState<UserResume | null>(null);
+  const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
   const supabase = createClient();
 
-  const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
+  const isSaved = selectedJob 
+    ? savedJobIds.has(selectedJob.id) || (selectedJob.applyLink && savedJobIds.has(selectedJob.applyLink))
+    : false;
+
+  const handleToggleSave = async () => {
+    if (!selectedJob || isTogglingSave) return;
+    setIsTogglingSave(true);
+    try {
+      if (isSaved) {
+        await unsaveJob(selectedJob.id);
+        toast.success(`Removed ${selectedJob.company} from Saved Jobs`);
+      } else {
+        await saveJob(selectedJob);
+        toast.success(`Saved ${selectedJob.company} to your Saved Jobs pipeline!`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update saved state");
+    } finally {
+      setIsTogglingSave(false);
+    }
+  };
+
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
   const processApplication = async () => {
@@ -73,16 +97,11 @@ export default function JobDetailsPage() {
           salary: selectedJob.salary,
           applyLink: selectedJob.applyLink,
         },
+        resume_snapshot: selectedResume.content,
       });
 
       if (error) throw error;
       toast.success("Application tracked successfully!");
-      
-      // Pass CV data to the JobVanta Chrome Extension
-      window.postMessage({
-        type: "JOBVANTA_CV_DATA",
-        cv: selectedResume.content
-      }, "*");
 
       // Open ATS link in new tab
       window.open(selectedJob.applyLink, "_blank");
@@ -105,12 +124,7 @@ export default function JobDetailsPage() {
       return;
     }
 
-    const isExtensionInstalled = document.getElementById("jobvanta-extension-active");
-    if (!isExtensionInstalled) {
-      setIsPromoModalOpen(true);
-    } else {
-      await processApplication();
-    }
+    await processApplication();
   };
 
   useEffect(() => {
@@ -148,8 +162,6 @@ export default function JobDetailsPage() {
     );
   }
 
-  const isSaved = savedJobIds.has(selectedJob.id);
-
   const handleMatch = async () => {
     setIsSaving(true);
     try {
@@ -182,7 +194,24 @@ export default function JobDetailsPage() {
             </Link>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+             <button
+               onClick={handleToggleSave}
+               disabled={isTogglingSave}
+               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs font-black transition-all cursor-pointer ${
+                 isSaved
+                   ? "bg-rose-50 border-rose-200 text-rose-600 shadow-sm"
+                   : "bg-white border-slate-200 text-slate-700 hover:border-rose-200 hover:text-rose-600 hover:bg-rose-50/40"
+               } ${isTogglingSave ? "opacity-60 cursor-not-allowed" : ""}`}
+             >
+               {isTogglingSave ? (
+                 <Loader2 className="w-4 h-4 animate-spin" />
+               ) : (
+                 <Heart className={`w-4 h-4 ${isSaved ? "fill-current text-rose-500" : ""}`} />
+               )}
+               <span>{isSaved ? "Saved" : "Save Job"}</span>
+             </button>
+
              <button className="p-2.5 rounded-xl border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-all">
                <Share2 className="w-5 h-5" />
              </button>
@@ -391,12 +420,35 @@ export default function JobDetailsPage() {
                   </button>
                   
                   <button 
-                    onClick={handleApplyExternally}
+                    onClick={() => {
+                      if (planTier === 'free') {
+                        setIsUpgradeModalOpen(true);
+                      } else {
+                        setIsApplyModalOpen(true);
+                      }
+                    }}
                     disabled={!selectedResume}
-                    className="w-full p-5 rounded-2xl bg-slate-900 text-white font-black text-sm hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+                    className="w-full p-5 rounded-2xl bg-blue-600 text-white font-black text-sm hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 cursor-pointer"
                   >
-                    Apply Now
+                    Open Job URL to Apply
                     <ExternalLink className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    onClick={handleToggleSave}
+                    disabled={isTogglingSave}
+                    className={`w-full p-4 rounded-2xl font-bold text-sm transition-all border flex items-center justify-center gap-2.5 active:scale-[0.98] cursor-pointer ${
+                      isSaved
+                        ? "bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100/70"
+                        : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    {isTogglingSave ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Heart className={`w-4 h-4 ${isSaved ? "fill-current text-rose-500" : "text-slate-400"}`} />
+                    )}
+                    <span>{isSaved ? "Saved to Pipeline" : "Save Job to Pipeline"}</span>
                   </button>
 
                   {selectedJob.company && (
@@ -473,15 +525,13 @@ export default function JobDetailsPage() {
         </div>
       </main>
 
-      {/* Extension Promo Modal */}
-      <ExtensionPromoModal 
-        isOpen={isPromoModalOpen} 
-        onClose={() => setIsPromoModalOpen(false)}
-        onContinue={() => {
-          setIsPromoModalOpen(false);
-          processApplication();
-        }} 
+      <ApplyModal
+        isOpen={isApplyModalOpen}
+        onClose={() => setIsApplyModalOpen(false)}
+        job={selectedJob}
+        selectedResume={selectedResume}
       />
+
       <UpgradeModal
         isOpen={isUpgradeModalOpen}
         onClose={() => setIsUpgradeModalOpen(false)}

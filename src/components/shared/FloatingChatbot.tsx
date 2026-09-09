@@ -118,7 +118,7 @@ export default function FloatingChatbot() {
         onClick={() => setIsOpen(!isOpen)}
         className="fixed bottom-6 right-6 w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl shadow-blue-500/20 hover:scale-110 active:scale-95 transition-all duration-200 cursor-pointer z-50 group border-2 border-white overflow-hidden bg-blue-600"
       >
-        <Image src="/avatar_2.jpg" alt="Lady on call" width={56} height={56} className="object-cover" />
+        <Image src="/avatar_2.jpg" alt="Lady on call" width={56} height={56} className="object-cover" loading="eager" priority />
       </button>
 
       {/* Chat Window Box */}

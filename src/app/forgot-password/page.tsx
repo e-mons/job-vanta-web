@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ForgotPasswordForm } from "./ForgotPasswordForm";
 import { Sparkles, ChevronLeft, KeyRound } from "lucide-react";
+import { Suspense } from "react";
 
 export default async function ForgotPasswordPage(props: { searchParams: Promise<{ message: string }> }) {
   const searchParams = await props.searchParams;
@@ -33,7 +34,7 @@ export default async function ForgotPasswordPage(props: { searchParams: Promise<
           
           <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 mb-3 text-center">Reset password</h1>
           <p className="text-slate-500 font-medium text-center">
-            Enter your email and we'll send you a reset link.
+            Enter your email and we'll send you a 6-digit recovery code.
           </p>
         </div>
 
@@ -42,7 +43,9 @@ export default async function ForgotPasswordPage(props: { searchParams: Promise<
           {/* Subtle accent line */}
           <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-600 to-indigo-600" />
           
-          <ForgotPasswordForm message={message} />
+          <Suspense fallback={<div className="h-40 flex items-center justify-center"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>}>
+            <ForgotPasswordForm message={message} />
+          </Suspense>
 
           <div className="mt-10 pt-8 border-t border-slate-100 text-center">
             <p className="text-sm text-slate-500 font-medium">

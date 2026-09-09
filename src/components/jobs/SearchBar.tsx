@@ -59,7 +59,8 @@ export default function SearchBar() {
       toast.error("Add skills to your resume first to use AI search!");
       return;
     }
-    searchByResume(skills);
+    const loc = locationFilter?.trim() || resumeData.personalInfo?.location || undefined;
+    searchByResume(skills, { location: loc });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

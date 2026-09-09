@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { 
@@ -12,22 +13,31 @@ import {
   LogOut,
   Plus,
   Bell,
-  Settings
+  Settings,
+  Bookmark,
+  CreditCard
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useJobStore } from "@/store/useJobStore";
 import { useResumeStore } from "@/store/useResumeStore";
 import { useSubscriptionStore } from "@/store/useSubscription";
 import { useNotificationStore } from "@/store/useNotificationStore";
+import { useAgentTrackerStore } from "@/store/useAgentTrackerStore";
 import { toast } from "sonner";
 
 export default function DashboardSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { reset: resetJobs } = useJobStore();
+  const { savedJobs, fetchSavedJobs, reset: resetJobs } = useJobStore();
   const { reset: resetResumes } = useResumeStore();
   const { status: subStatus } = useSubscriptionStore();
   const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const agentStatus = useAgentTrackerStore((s) => s.status);
+  const isAgentActive = agentStatus === "queued" || agentStatus === "checking" || agentStatus === "applying" || agentStatus === "needs_info" || agentStatus === "action_required";
+
+  useEffect(() => {
+    fetchSavedJobs();
+  }, [fetchSavedJobs]);
 
   const handleSignOut = async () => {
     try {
@@ -48,16 +58,24 @@ export default function DashboardSidebar() {
     { icon: <FileText className="w-5 h-5" />, label: "My Resumes", href: "/builder" },
     { icon: <Mail className="w-5 h-5" />, label: "Cover Letters", href: "/cover-letter" },
     { icon: <Search className="w-5 h-5" />, label: "Job Search", href: "/jobs" },
-    { icon: <Briefcase className="w-5 h-5" />, label: "Saved Jobs", href: "/jobs/saved" },
-    { icon: <Clock className="w-5 h-5" />, label: "Application History", href: "/jobs/history" },
+    { icon: <Bookmark className="w-5 h-5" />, label: "Saved Jobs", href: "/jobs/saved", badge: savedJobs.length },
+    { 
+      icon: <Clock className="w-5 h-5" />, 
+      label: "Applications", 
+      href: "/applications",
+      isLive: isAgentActive,
+    },
+    { icon: <CreditCard className="w-5 h-5" />, label: "Billing & Plans", href: "/dashboard/billing" },
     { icon: <Bell className="w-5 h-5" />, label: "Notifications", href: "/dashboard/notifications" },
     { icon: <Settings className="w-5 h-5" />, label: "Settings", href: "/dashboard/settings" }
   ];
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard';
+    if (href === '/dashboard/billing') return pathname.startsWith('/dashboard/billing');
+    if (href === '/jobs/saved') return pathname === '/jobs/saved';
+    if (href === '/applications') return pathname.startsWith('/applications') || pathname.startsWith('/jobs/history');
     if (href === '/jobs') {
-      // Active for exact /jobs or sub-paths like /jobs/123, but NOT for saved/history
       return pathname === '/jobs' || (pathname.startsWith('/jobs/') && !pathname.startsWith('/jobs/saved') && !pathname.startsWith('/jobs/history'));
     }
     return pathname.startsWith(href);
@@ -86,6 +104,19 @@ export default function DashboardSidebar() {
             >
               {item.icon}
               <span className="flex-1">{item.label}</span>
+              {item.isLive && (
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500 text-white animate-pulse flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                  AI Active
+                </span>
+              )}
+              {item.label === "Saved Jobs" && typeof item.badge === "number" && item.badge > 0 && (
+                <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-black flex items-center justify-center ${
+                  active ? 'bg-white text-blue-600' : 'bg-blue-50 text-blue-600 border border-blue-100'
+                }`}>
+                  {item.badge}
+                </span>
+              )}
               {item.label === "Notifications" && unreadCount > 0 && (
                 <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-black flex items-center justify-center ${
                   active ? 'bg-white text-blue-600' : 'bg-red-500 text-white animate-pulse'

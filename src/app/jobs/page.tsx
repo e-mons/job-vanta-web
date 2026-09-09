@@ -1,26 +1,30 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Briefcase, 
-  Bookmark, 
-  TrendingUp, 
   Search as SearchIcon, 
-  LogOut, 
-  LayoutDashboard,
-  Sparkles,
-  ArrowLeft,
-  Filter,
-  Loader2,
+  Sparkles, 
+  ArrowLeft, 
+  Filter, 
+  Loader2, 
+  MapPin, 
+  Globe, 
+  ChevronDown,
+  RefreshCw,
+  SlidersHorizontal,
+  Flame,
   CheckCircle2,
-  MapPin,
-  Globe,
-  ChevronDown
+  AlertTriangle
 } from "lucide-react";
 import JobCard from "@/components/jobs/JobCard";
 import ResumeSelector from "@/components/jobs/ResumeSelector";
+import PlatformSelectorCards from "@/components/jobs/PlatformSelectorCards";
+import ResumeCompletenessSidebar from "@/components/jobs/ResumeCompletenessSidebar";
+import ApplyModal from "@/components/jobs/ApplyModal";
+import MissingFieldsModal from "@/components/jobs/MissingFieldsModal";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useJobStore, Job } from "@/store/useJobStore";
 import { useResumeStore, UserResume } from "@/store/useResumeStore";
@@ -30,7 +34,7 @@ import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { toast } from "sonner";
 import { useSubscriptionStore } from "@/store/useSubscription";
 import UpgradeModal from "@/components/shared/UpgradeModal";
-import ExtensionPromoModal from "@/components/jobs/ExtensionPromoModal";
+import { FormFieldDefinition } from "@/services/automation/browserbaseService";
 
 function JobsPageContent() {
   const { 
@@ -42,10 +46,11 @@ function JobsPageContent() {
     reset: resetJobs,
     setSelectedJob,
     selectedJob,
+    selectedPlatforms,
     hasSearched,
     setHasSearched
   } = useJobStore();
-  const { userResumes, fetchUserResumes, reset: resetResumes } = useResumeStore();
+  const { userResumes, fetchUserResumes } = useResumeStore();
   const { getPlanTier } = useSubscriptionStore();
   const planTier = getPlanTier();
   const [selectedResume, setSelectedResume] = useState<UserResume | null>(null);
@@ -59,18 +64,132 @@ function JobsPageContent() {
   const [filterExperience, setFilterExperience] = useState("Mid-level");
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
   
-  // Modal states
+  // Application Tracking & Modals
+  const [userApplicationsMap, setUserApplicationsMap] = useState<
+    Record<string, { id: string; status: string; missingFields: FormFieldDefinition[] }>
+  >({});
+  const [selectedApplyJob, setSelectedApplyJob] = useState<Job | null>(null);
+  const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
+
+  const [activeMissingAppId, setActiveMissingAppId] = useState<string | null>(null);
+  const [activeMissingFields, setActiveMissingFields] = useState<FormFieldDefinition[]>([]);
+  const [isMissingFieldsModalOpen, setIsMissingFieldsModalOpen] = useState(false);
+
+  // Upgrade Modal
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
-  const [upgradeTargetTier, setUpgradeTargetTier] = useState<'pro' | 'enterprise'>('pro');
+  const [upgradeTargetTier, setUpgradeTargetTier] = useState<'pro' | 'unlimited'>('pro');
 
   const searchParams = useSearchParams();
   const resumeIdParam = searchParams.get("resumeId");
   const triggerSearchParam = searchParams.get("triggerSearch");
 
+  const supabase = createClient();
+
+  // Load user applications to reflect live status badges
+  const loadUserApplications = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: apps } = await supabase
+        .from("job_applications")
+        .select("id, status, metadata, missing_fields")
+        .eq("user_id", user.id);
+
+      if (apps) {
+        const map: Record<string, { id: string; status: string; missingFields: FormFieldDefinition[] }> = {};
+        apps.forEach((a: any) => {
+          const url = a.metadata?.applyLink || a.metadata?.job_url;
+          const jobId = a.metadata?.jobId || a.metadata?.job_id;
+          const entry = {
+            id: a.id,
+            status: a.status,
+            missingFields: Array.isArray(a.missing_fields) ? a.missing_fields : [],
+          };
+          if (url) {
+            map[url] = entry;
+            const cleanUrl = url.replace(/^https?:\/\//, "").replace(/\/$/, "");
+            map[cleanUrl] = entry;
+          }
+          if (jobId) {
+            map[jobId] = entry;
+          }
+        });
+        setUserApplicationsMap(map);
+      }
+    } catch (err) {
+      console.warn("[JobsPage] Error loading applications:", err);
+    }
+  }, [supabase]);
+
   useEffect(() => {
     fetchSavedJobs();
     fetchUserResumes();
-  }, [fetchSavedJobs, fetchUserResumes]);
+    loadUserApplications();
+  }, [fetchSavedJobs, fetchUserResumes, loadUserApplications]);
+
+  // Real-time synchronization for active applications
+  useEffect(() => {
+    let channel: any = null;
+    let isMounted = true;
+
+    const setupRealtime = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || !isMounted) return;
+
+        const channelName = `user-job-apps-${user.id}-${Math.random().toString(36).substring(2, 9)}`;
+        const newChannel = supabase.channel(channelName);
+
+        newChannel
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "job_applications",
+              filter: `user_id=eq.${user.id}`,
+            },
+            (payload) => {
+              if (!isMounted) return;
+              console.log("[JobsPage Realtime] Application update:", payload);
+              loadUserApplications();
+            }
+          )
+          .subscribe();
+
+        channel = newChannel;
+      } catch (e) {
+        console.warn("[JobsPage Realtime] Setup error:", e);
+      }
+    };
+
+    setupRealtime();
+
+    return () => {
+      isMounted = false;
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [supabase, loadUserApplications]);
+
+  // Polling fallback while any application is in an active state
+  const hasActiveApplications = useMemo(() => {
+    return Object.values(userApplicationsMap).some(
+      (app) => app.status === "queued" || app.status === "detecting_fields" || app.status === "submitting"
+    );
+  }, [userApplicationsMap]);
+
+  useEffect(() => {
+    if (!hasActiveApplications) return;
+
+    const interval = setInterval(() => {
+      loadUserApplications();
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [hasActiveApplications, loadUserApplications]);
 
   // Handle auto-selection of resume from URL
   useEffect(() => {
@@ -79,19 +198,24 @@ function JobsPageContent() {
       if (resume) {
         setSelectedResume(resume);
         if (triggerSearchParam === "true") {
-          searchByResume(resume.content.skills || [], {
-            location: filterLocation,
-            radius: filterRadius,
-            isRemote: filterRemote,
-            jobType: filterJobType,
-            experienceLevel: filterExperience
-          });
+          searchByResume(
+            resume.content?.skills || [],
+            {
+              location: filterLocation,
+              radius: filterRadius,
+              isRemote: filterRemote,
+              jobType: filterJobType,
+              experienceLevel: filterExperience,
+            },
+            resume.id,
+            selectedPlatforms
+          );
         }
       }
     }
-  }, [resumeIdParam, userResumes, selectedResume, triggerSearchParam]);
+  }, [resumeIdParam, userResumes, selectedResume, triggerSearchParam, selectedPlatforms]);
 
-  // Auto-detect client location from resume, IP, or timezone if optional location input is empty
+  // Auto-detect client location
   const detectUserLocation = async (): Promise<string> => {
     if (selectedResume?.content?.personalInfo?.location) {
       return selectedResume.content.personalInfo.location;
@@ -104,15 +228,8 @@ function JobsPageContent() {
           return `${data.city}, ${data.country_name}`;
         }
       }
-    } catch (e) {}
-    try {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const parts = tz.split("/");
-      if (parts.length > 1) {
-        return `${parts[parts.length - 1].replace(/_/g, " ")}, ${parts[0]}`;
-      }
-    } catch (e) {}
-    return "";
+    } catch {}
+    return "Remote";
   };
 
   const handleResumeSelect = (resume: UserResume) => {
@@ -125,13 +242,18 @@ function JobsPageContent() {
     if (!locationToUse || locationToUse.trim().length === 0) {
       locationToUse = await detectUserLocation();
     }
-    searchByResume(selectedResume.content.skills || [], {
-      location: locationToUse,
-      radius: filterRadius,
-      isRemote: filterRemote,
-      jobType: filterJobType,
-      experienceLevel: filterExperience
-    });
+    searchByResume(
+      selectedResume.content?.skills || [],
+      {
+        location: locationToUse,
+        radius: filterRadius,
+        isRemote: filterRemote,
+        jobType: filterJobType,
+        experienceLevel: filterExperience,
+      },
+      selectedResume.id,
+      selectedPlatforms
+    );
   };
 
   const handleResetSelection = () => {
@@ -140,268 +262,216 @@ function JobsPageContent() {
     resetJobs();
   };
 
-  const handleViewJob = (job: Job) => {
+  // Open the Apply Modal with choices (Manual vs AI Agent)
+  const handleOpenApplyModal = (job: Job) => {
     if (planTier === 'free') {
       setUpgradeTargetTier('pro');
       setIsUpgradeModalOpen(true);
       return;
     }
-    setSelectedJob(job);
-    router.push(`/jobs/${job.id}`);
+    setSelectedApplyJob(job);
+    setIsApplyModalOpen(true);
   };
 
-  const supabase = createClient();
+  // Handle Missing Fields Resolution
+  const handleResolveMissingFields = (job: Job) => {
+    const applyUrl = job.job_url || job.applyLink || "";
+    const cleanUrl = applyUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    const appInfo = userApplicationsMap[job.id] || userApplicationsMap[applyUrl] || userApplicationsMap[cleanUrl];
 
-  const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
-  const [pendingJobToApply, setPendingJobToApply] = useState<Job | null>(null);
-
-  const processApplication = async (jobToApply: Job) => {
-    if (!selectedResume) return;
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Must be logged in to apply for jobs");
-
-      const { error } = await supabase.from("job_applications").insert({
-        user_id: user.id,
-        resume_id: selectedResume.id,
-        status: "applied",
-        metadata: {
-          title: jobToApply.title,
-          company: jobToApply.company,
-          location: jobToApply.location,
-          type: jobToApply.type,
-          salary: jobToApply.salary,
-          applyLink: jobToApply.applyLink,
-        },
-      });
-
-      if (error) throw error;
-      toast.success("Application tracked successfully!");
-      
-      // Pass CV data to the JobVanta Chrome Extension
-      window.postMessage({
-        type: "JOBVANTA_CV_DATA",
-        cv: selectedResume.content
-      }, "*");
-
-      window.open(jobToApply.applyLink, "_blank");
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Failed to log application.");
+    if (appInfo && appInfo.missingFields.length > 0) {
+      setActiveMissingAppId(appInfo.id);
+      setActiveMissingFields(appInfo.missingFields);
+      setIsMissingFieldsModalOpen(true);
+    } else if (selectedResume) {
+      // Redirect to dedicated resume view page
+      router.push(`/resumes/${selectedResume.id}?applicationId=${appInfo?.id || ""}`);
     }
   };
 
-  const handleApplyNow = async (targetJob?: Job) => {
-    if (planTier === 'free') {
-      setUpgradeTargetTier('pro');
-      setIsUpgradeModalOpen(true);
-      return;
-    }
-    
-    const jobToApply = targetJob || selectedJob;
-    if (!jobToApply || !selectedResume) {
-      toast.error("Please select a resume first!");
-      return;
-    }
-    
-    if (!jobToApply.applyLink) {
-      toast.error("No application link provided for this job.");
-      return;
-    }
-
-    const isExtensionInstalled = document.getElementById("jobvanta-extension-active");
-    if (!isExtensionInstalled) {
-      setPendingJobToApply(jobToApply);
-      setIsPromoModalOpen(true);
-    } else {
-      await processApplication(jobToApply);
-    }
-  };
-
-  const displayLimit = planTier === 'free' ? 6 : planTier === 'pro' ? 18 : Infinity;
+  const displayLimit = planTier === 'free' ? 25 : planTier === 'pro' ? 45 : Infinity;
   const displayedJobs = searchResults.slice(0, displayLimit);
-  const hasHiddenJobs = planTier !== 'enterprise' && searchResults.length === displayLimit;
+  const hasHiddenJobs = (planTier !== 'unlimited' && (planTier as any) !== 'enterprise') && searchResults.length > displayLimit;
 
   const handleUpgradePrompt = () => {
-    setUpgradeTargetTier(planTier === 'free' ? 'pro' : 'enterprise');
+    setUpgradeTargetTier(planTier === 'free' ? 'pro' : 'unlimited');
     setIsUpgradeModalOpen(true);
   };
 
   return (
     <DashboardLayout>
-      <div className="p-4 sm:p-8 lg:p-12 pb-24 lg:pb-12">
-        <div className="max-w-6xl mx-auto space-y-12">
-          {/* Header Area */}
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div>
-              <div className="flex items-center gap-2 text-blue-600 mb-2">
-                <SearchIcon className="w-5 h-5" />
-                <span className="text-xs font-black uppercase tracking-widest">Marketplace</span>
-              </div>
-              <h1 className="text-4xl font-black text-slate-900 tracking-tight">
-                {hasSearched && selectedResume ? (
-                  <>Matching Jobs for <span className="text-blue-600">{selectedResume.title}</span></>
-                ) : (
-                  <>Find your <span className="text-blue-600">dream job</span></>
-                )}
-              </h1>
-              <p className="text-slate-500 font-medium mt-1">
-                {hasSearched && selectedResume 
-                  ? "We've analyzed your skills and filters to find the best opportunities."
-                  : "Choose your resume and search verified opportunities instantly."}
-              </p>
+      <div className="p-4 sm:p-8 lg:p-10 pb-24 lg:pb-12 max-w-7xl mx-auto space-y-10">
+        {/* Header Title Area (NO stats cards) */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2 border-b border-slate-100">
+          <div>
+            <div className="flex items-center gap-2 text-blue-600 mb-2">
+              <SearchIcon className="w-4 h-4" />
+              <span className="text-xs font-black uppercase tracking-widest">
+                AI Job Discovery & Automated Applications
+              </span>
             </div>
+            <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
+              {hasSearched && selectedResume ? (
+                <>Top Job Matches for <span className="text-blue-600">{selectedResume.title}</span></>
+              ) : (
+                <>Targeted <span className="text-blue-600">Job Search</span></>
+              )}
+            </h1>
+            <p className="text-slate-500 font-medium text-sm mt-1">
+              {hasSearched && selectedResume 
+                ? "Live verified opportunities. Apply manually or automate with our AI Agent."
+                : "Select your CV and target platforms to query verified hiring portals via Brave Search."}
+            </p>
           </div>
 
-          <AnimatePresence mode="wait">
-            {!hasSearched ? (
-              <motion.div
-                key="search-config"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="space-y-12"
+          {hasSearched && (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleSearchSubmit}
+                disabled={isLoading}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-black transition-all border border-blue-200 shadow-sm"
               >
-                {/* Step 1: Select Resume */}
-                <div className="space-y-8">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 rounded-2xl bg-blue-600 text-white shadow-xl shadow-blue-600/20">
-                        <Sparkles className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
-                          1. Select Resume
-                          <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
-                            Compulsory
-                          </span>
-                        </h2>
-                        <p className="text-sm text-slate-500 font-medium mt-0.5">Which resume should we base your job search on?</p>
-                      </div>
-                    </div>
-                  </div>
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+                <span>Refresh Jobs</span>
+              </button>
 
-                  {userResumes.length > 0 ? (
-                    <ResumeSelector 
-                      resumes={userResumes} 
-                      onSelect={handleResumeSelect}
-                      selectedId={selectedResume?.id}
-                    />
-                  ) : (
-                    <div className="text-center py-20 bg-white rounded-[40px] border-2 border-dashed border-slate-200">
-                      <Briefcase className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                      <p className="text-slate-500 font-bold mb-6 text-lg">No resumes found yet</p>
-                      <Link 
-                        href="/builder"
-                        className="inline-flex items-center gap-2 px-8 py-4 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20"
-                      >
-                        Create Your First Resume
-                      </Link>
-                    </div>
-                  )}
-                </div>
+              <button
+                onClick={handleResetSelection}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white text-slate-700 hover:bg-slate-50 text-xs font-bold transition-all border border-slate-200 shadow-sm"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Change CV / Filters</span>
+              </button>
+            </div>
+          )}
+        </div>
 
-                {/* Step 2: Optional Filters Form Box */}
-                {userResumes.length > 0 && (
-                  <div className="relative rounded-[40px] bg-slate-50/70 border border-slate-200 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
-                    
-                    {/* Accordion Toggle Header */}
-                    <button
-                      type="button"
-                      onClick={() => setIsFiltersExpanded(!isFiltersExpanded)}
-                      className="w-full flex items-center justify-between p-8 sm:p-10 text-left outline-none cursor-pointer focus:bg-slate-100/30 select-none group"
-                    >
+        {/* Main Workspace Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Main Search & Results Column */}
+          <div className="lg:col-span-8 space-y-8">
+            <AnimatePresence mode="wait">
+              {!hasSearched ? (
+                <motion.div
+                  key="search-configuration"
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  className="space-y-8"
+                >
+                  {/* Step 1: Select Resume */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="p-3 rounded-2xl bg-white border border-slate-200 text-slate-700 shadow-sm group-hover:scale-105 transition-transform duration-300">
-                          <Filter className="w-5 h-5 text-slate-600" />
+                        <div className="p-2.5 rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/20">
+                          <Sparkles className="w-5 h-5" />
                         </div>
                         <div>
                           <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
-                            2. Optional Filters
-                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-slate-200/60 px-2.5 py-1 rounded-md">
-                              Optional
+                            1. Select Resume
+                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-100">
+                              Compulsory
                             </span>
                           </h2>
-                          <p className="text-sm text-slate-500 font-medium">Fine-tune your search with these optional settings (or leave them empty!)</p>
+                          <p className="text-xs text-slate-500 font-medium">
+                            Tailor queries and match scoring to your exact experience
+                          </p>
                         </div>
                       </div>
-                      
-                      <div className={`p-3 rounded-2xl bg-white border border-slate-200 shadow-sm transition-all duration-300 group-hover:bg-slate-50 ${isFiltersExpanded ? 'rotate-180 text-blue-600 border-blue-200' : 'text-slate-400'}`}>
-                        <ChevronDown className="w-5 h-5" />
-                      </div>
-                    </button>
+                    </div>
 
-                    {/* Accordion Content */}
-                    <AnimatePresence initial={false}>
-                      {isFiltersExpanded && (
-                        <motion.div
-                          key="filters-content"
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ 
-                            height: "auto", 
-                            opacity: 1,
-                            transition: {
-                              height: { type: "spring", stiffness: 300, damping: 30 },
-                              opacity: { duration: 0.2, delay: 0.05 }
-                            }
-                          }}
-                          exit={{ 
-                            height: 0, 
-                            opacity: 0,
-                            transition: {
-                              height: { duration: 0.25 },
-                              opacity: { duration: 0.15 }
-                            }
-                          }}
-                          className="overflow-hidden"
+                    {userResumes.length > 0 ? (
+                      <ResumeSelector 
+                        resumes={userResumes} 
+                        onSelect={handleResumeSelect}
+                        selectedId={selectedResume?.id}
+                      />
+                    ) : (
+                      <div className="text-center py-16 bg-white rounded-3xl border-2 border-dashed border-slate-200">
+                        <Briefcase className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                        <p className="text-slate-600 font-bold mb-4 text-base">No resumes found yet</p>
+                        <Link 
+                          href="/builder"
+                          className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 transition-all text-sm shadow-lg shadow-blue-600/20"
                         >
-                          <div className="p-8 sm:p-10 pt-0 sm:pt-0 border-t border-dashed border-slate-200/60 space-y-8">
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-8">
-                              {/* Preferred City/State */}
-                              <div className="space-y-2">
-                                <label className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
-                                  <MapPin className="w-4 h-4 text-slate-400" />
-                                  Preferred City / State
+                          Create Your First Resume
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Step 2: Select Target Platforms (Greenhouse, Lever, Workable, Wellfound) */}
+                  {userResumes.length > 0 && (
+                    <div className="p-6 sm:p-8 rounded-3xl bg-white border border-slate-200/80 shadow-sm space-y-4">
+                      <PlatformSelectorCards />
+                    </div>
+                  )}
+
+                  {/* Step 3: Optional Search Filters */}
+                  {userResumes.length > 0 && (
+                    <div className="rounded-3xl bg-slate-50/70 border border-slate-200/80 shadow-sm overflow-hidden transition-all">
+                      <button
+                        type="button"
+                        onClick={() => setIsFiltersExpanded(!isFiltersExpanded)}
+                        className="w-full flex items-center justify-between p-6 text-left outline-none cursor-pointer focus:bg-slate-100/50 select-none group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="p-2.5 rounded-2xl bg-white border border-slate-200 text-slate-700 shadow-sm group-hover:scale-105 transition-transform">
+                            <SlidersHorizontal className="w-4 h-4 text-slate-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                              Optional Search Filters
+                              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-200/70 px-2 py-0.5 rounded-md">
+                                Optional
+                              </span>
+                            </h3>
+                            <p className="text-xs text-slate-500 font-medium">
+                              Refine location, job type, or remote preferences (or leave empty)
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className={`p-2.5 rounded-2xl bg-white border border-slate-200 shadow-sm transition-all ${isFiltersExpanded ? 'rotate-180 text-blue-600 border-blue-200' : 'text-slate-400'}`}>
+                          <ChevronDown className="w-4 h-4" />
+                        </div>
+                      </button>
+
+                      <AnimatePresence initial={false}>
+                        {isFiltersExpanded && (
+                          <motion.div
+                            key="filters-drawer"
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.25 }}
+                            className="overflow-hidden border-t border-dashed border-slate-200 px-6 pb-6 pt-6"
+                          >
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                              {/* Location */}
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                                  <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                                  Target Location
                                 </label>
                                 <input
                                   type="text"
-                                  placeholder="e.g. New York, NY or Remote"
+                                  placeholder="e.g. San Francisco, CA or Remote"
                                   value={filterLocation}
                                   onChange={(e) => setFilterLocation(e.target.value)}
-                                  className="w-full px-5 py-4 rounded-2xl bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400 outline-none text-base font-bold shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                                  className="w-full px-4 py-3 rounded-2xl bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400 outline-none text-sm font-medium shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
                                 />
                               </div>
 
-                              {/* Radius */}
-                              <div className="space-y-2">
-                                <label className="text-sm font-bold text-slate-700">
-                                  Radius (miles)
-                                </label>
-                                <select
-                                  value={filterRadius}
-                                  onChange={(e) => setFilterRadius(e.target.value)}
-                                  className="w-full px-5 py-4 rounded-2xl bg-white border border-slate-200 text-slate-900 outline-none text-base font-bold shadow-sm focus:border-blue-500 transition-all appearance-none cursor-pointer"
-                                  style={{ backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 1.25rem center', backgroundSize: '1.5em 1.5em', backgroundRepeat: 'no-repeat' }}
-                                >
-                                  <option value="5">Within 5 miles</option>
-                                  <option value="15">Within 15 miles</option>
-                                  <option value="25">Within 25 miles</option>
-                                  <option value="50">Within 50 miles</option>
-                                  <option value="100">Within 100 miles</option>
-                                </select>
-                              </div>
-
                               {/* Job Type */}
-                              <div className="space-y-2">
-                                <label className="text-sm font-bold text-slate-700">
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700">
                                   Job Type
                                 </label>
                                 <select
                                   value={filterJobType}
                                   onChange={(e) => setFilterJobType(e.target.value)}
-                                  className="w-full px-5 py-4 rounded-2xl bg-white border border-slate-200 text-slate-900 outline-none text-base font-bold shadow-sm focus:border-blue-500 transition-all appearance-none cursor-pointer"
-                                  style={{ backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 1.25rem center', backgroundSize: '1.5em 1.5em', backgroundRepeat: 'no-repeat' }}
+                                  className="w-full px-4 py-3 rounded-2xl bg-white border border-slate-200 text-slate-900 outline-none text-sm font-medium shadow-sm focus:border-blue-500 transition-all cursor-pointer"
                                 >
                                   <option value="Full-time">Full-time</option>
                                   <option value="Part-time">Part-time</option>
@@ -411,15 +481,14 @@ function JobsPageContent() {
                               </div>
 
                               {/* Experience Level */}
-                              <div className="space-y-2">
-                                <label className="text-sm font-bold text-slate-700">
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700">
                                   Experience Level
                                 </label>
                                 <select
                                   value={filterExperience}
                                   onChange={(e) => setFilterExperience(e.target.value)}
-                                  className="w-full px-5 py-4 rounded-2xl bg-white border border-slate-200 text-slate-900 outline-none text-base font-bold shadow-sm focus:border-blue-500 transition-all appearance-none cursor-pointer"
-                                  style={{ backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 1.25rem center', backgroundSize: '1.5em 1.5em', backgroundRepeat: 'no-repeat' }}
+                                  className="w-full px-4 py-3 rounded-2xl bg-white border border-slate-200 text-slate-900 outline-none text-sm font-medium shadow-sm focus:border-blue-500 transition-all cursor-pointer"
                                 >
                                   <option value="Entry-level">Entry-level</option>
                                   <option value="Mid-level">Mid-level</option>
@@ -428,176 +497,253 @@ function JobsPageContent() {
                                 </select>
                               </div>
 
-                              {/* Remote Only */}
-                              <div className="flex items-end">
-                                <label className="w-full flex items-center gap-4 cursor-pointer p-4 rounded-2xl bg-white border border-slate-200 hover:border-blue-500 shadow-sm transition-all select-none">
+                              {/* Remote Checkbox */}
+                              <div className="md:col-span-2 lg:col-span-3 pt-2">
+                                <label className="inline-flex items-center gap-3 cursor-pointer p-3.5 px-4 rounded-2xl bg-white border border-slate-200 hover:border-blue-500 shadow-sm transition-all select-none">
                                   <input
                                     type="checkbox"
                                     checked={filterRemote}
                                     onChange={(e) => setFilterRemote(e.target.checked)}
-                                    className="w-5 h-5 accent-blue-600 rounded cursor-pointer shrink-0"
+                                    className="w-4 h-4 accent-blue-600 rounded cursor-pointer shrink-0"
                                   />
-                                  <div className="flex flex-col">
-                                    <span className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-                                      <Globe className="w-4 h-4 text-blue-500" />
-                                      Remote Only
-                                    </span>
-                                    <span className="text-[11px] text-slate-500 font-medium">Work-from-home jobs only</span>
-                                  </div>
+                                  <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                    <Globe className="w-3.5 h-3.5 text-blue-500" />
+                                    Prioritize 100% Remote Opportunities
+                                  </span>
                                 </label>
                               </div>
                             </div>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                )}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
 
-                {/* Big Search CTA */}
-                {userResumes.length > 0 && (
-                  <div className="pt-4">
-                    <button
-                      onClick={handleSearchSubmit}
-                      disabled={!selectedResume || isLoading}
-                      className={`w-full py-5 rounded-3xl font-black text-lg transition-all duration-300 flex items-center justify-center gap-3 shadow-xl ${
-                        selectedResume 
-                          ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/30 hover:scale-[1.01] active:scale-[0.99] cursor-pointer" 
-                          : "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
-                      }`}
-                    >
-                      {isLoading ? (
-                        <Loader2 className="w-6 h-6 animate-spin" />
-                      ) : (
-                        <>
-                          <Sparkles className="w-6 h-6" />
-                          <span>Search Matching Jobs</span>
-                        </>
+                  {/* Primary Search CTA */}
+                  {userResumes.length > 0 && (
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={handleSearchSubmit}
+                        disabled={!selectedResume || isLoading}
+                        className={`w-full py-4 sm:py-5 rounded-3xl font-black text-base transition-all duration-300 flex items-center justify-center gap-3 shadow-xl ${
+                          selectedResume 
+                            ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/30 hover:scale-[1.005] active:scale-[0.99] cursor-pointer" 
+                            : "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+                        }`}
+                      >
+                        {isLoading ? (
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <span>Searching Greenhouse, Lever, Workable & Wellfound...</span>
+                          </div>
+                        ) : (
+                          <>
+                            <Sparkles className="w-5 h-5" />
+                            <span>Search Matching Jobs Across Platforms</span>
+                          </>
+                        )}
+                      </button>
+                      {!selectedResume && (
+                        <p className="text-center text-rose-500 font-bold text-xs mt-3">
+                          ⚠️ Please select a resume above to launch your search!
+                        </p>
                       )}
-                    </button>
-                    {!selectedResume && (
-                      <p className="text-center text-rose-500 font-bold text-sm mt-3 animate-pulse">
-                        ⚠️ Please select a resume above to search!
+                    </div>
+                  )}
+                </motion.div>
+              ) : (
+                /* Results View: Top Job Matches List */
+                <motion.div
+                  key="results-active-view"
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-8"
+                >
+                  {/* Results Header Bar */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-3xl bg-white border border-slate-200 shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-600/20">
+                        <Flame className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-black text-slate-900 leading-tight">
+                          Top Job Matches ({displayedJobs.length})
+                        </h2>
+                        <p className="text-xs text-slate-500 font-medium">
+                          Queried from {selectedPlatforms.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(", ")}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-xl">
+                        Sorted by Fit Score
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Loading State */}
+                  {isLoading && (
+                    <div className="space-y-6">
+                      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-3xl p-6 shadow-xl flex items-center justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 text-[10px] font-black uppercase tracking-widest backdrop-blur-md">
+                            <Sparkles className="w-3 h-3 text-blue-200 animate-spin" />
+                            Brave Job Search Engine Active
+                          </div>
+                          <h4 className="text-xl font-black">Querying Live Platform Boards...</h4>
+                          <p className="text-xs text-blue-100 font-medium">Evaluating job descriptions, requirements, and salaries.</p>
+                        </div>
+                        <Loader2 className="w-7 h-7 text-white animate-spin shrink-0" />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {[...Array(4)].map((_, i) => (
+                          <div key={i} className="p-6 rounded-[32px] bg-white border border-slate-200/80 shadow-sm h-[320px] flex flex-col justify-between">
+                            <div className="flex items-center gap-3">
+                              <Skeleton className="w-12 h-12 rounded-2xl bg-slate-100" />
+                              <div className="space-y-2 flex-1">
+                                <Skeleton className="w-24 h-4 bg-slate-100" />
+                                <Skeleton className="w-16 h-3 bg-slate-100" />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Skeleton className="w-3/4 h-5 bg-slate-100" />
+                              <Skeleton className="w-1/2 h-4 bg-slate-100" />
+                            </div>
+                            <Skeleton className="w-full h-10 rounded-xl bg-slate-100" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Error State */}
+                  {error && !isLoading && (
+                    <div className="text-center py-16 bg-rose-50 rounded-3xl border border-rose-100 p-6 space-y-3">
+                      <p className="text-rose-600 font-bold text-base">{error}</p>
+                      <button 
+                        onClick={handleSearchSubmit}
+                        className="px-6 py-2.5 rounded-xl bg-rose-600 text-white font-bold text-xs hover:bg-rose-700 transition-colors shadow-md shadow-rose-600/20"
+                      >
+                        Try Again
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Results Grid */}
+                  {!isLoading && displayedJobs.length > 0 && (
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {displayedJobs.map((job, index) => {
+                          const applyUrl = job.job_url || job.applyLink || "";
+                          const cleanUrl = applyUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
+                          const appTracking = userApplicationsMap[job.id] || userApplicationsMap[applyUrl] || userApplicationsMap[cleanUrl];
+                          const liveStatus = appTracking?.status || job.applied_status || "not_applied";
+
+                          return (
+                            <JobCard
+                              key={job.id || `${job.title}-${index}`}
+                              job={job}
+                              index={index}
+                              applicationStatus={liveStatus}
+                              onApplyNow={() => handleOpenApplyModal(job)}
+                              onResolveMissing={() => handleResolveMissingFields(job)}
+                              isLocked={planTier === 'free'}
+                              onUpgradeClick={handleUpgradePrompt}
+                              matchSkills={selectedResume?.content?.skills || []}
+                            />
+                          );
+                        })}
+                      </div>
+
+                      {hasHiddenJobs && (
+                        <div className="p-6 rounded-3xl bg-gradient-to-r from-slate-900 to-blue-900 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-5 shadow-xl text-white">
+                          <div>
+                            <h4 className="text-xl font-black mb-1">
+                              Unlock {searchResults.length - displayLimit} more matching opportunities!
+                            </h4>
+                            <p className="text-xs text-blue-200 font-medium">
+                              Upgrade your plan to unlock direct instant applications and see all matches.
+                            </p>
+                          </div>
+                          <button
+                            onClick={handleUpgradePrompt}
+                            className="px-6 py-3 rounded-2xl bg-white text-slate-900 font-black text-xs hover:bg-blue-50 transition-all shrink-0 shadow-md"
+                          >
+                            Upgrade to Pro
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Fallback Zero Results */}
+                  {!isLoading && !error && searchResults.length === 0 && (
+                    <div className="text-center py-24 bg-white rounded-3xl border border-slate-200 p-8 space-y-4">
+                      <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto text-slate-300">
+                        <SearchIcon className="w-8 h-8" />
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-800">Broadening job search...</h3>
+                      <p className="text-slate-500 text-xs max-w-sm mx-auto">
+                        We are currently expanding queries across Greenhouse, Lever, Workable, and Wellfound.
                       </p>
-                    )}
-                  </div>
-                )}
-              </motion.div>
-            ) : (
-              <motion.div
-                key="results-view"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="space-y-12"
-              >
-                <div className="flex items-center justify-between">
-                  <button 
-                    onClick={handleResetSelection}
-                    className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-all shadow-sm"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    Change Resume & Filters
-                  </button>
-                </div>
-
-                {/* Loading state */}
-                {isLoading && (
-                  <div className="space-y-8">
-                    <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white rounded-3xl p-8 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-6 overflow-hidden relative animate-pulse">
-                      <div className="space-y-2 relative z-10 text-center sm:text-left">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-[10px] font-black uppercase tracking-widest backdrop-blur-md">
-                          <Sparkles className="w-3.5 h-3.5 text-blue-200 animate-spin" />
-                          JobVanta AI Engine Active
-                        </div>
-                        <h3 className="text-2xl font-black tracking-tight">Matching opportunities tailored to your CV...</h3>
-                        <p className="text-blue-100 text-xs font-medium">Scanning verified tech companies, salaries, and remote openings in real-time.</p>
-                      </div>
-                      <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-xl flex items-center justify-center shrink-0 border border-white/30 shadow-lg">
-                        <Loader2 className="w-7 h-7 text-white animate-spin" />
-                      </div>
+                      <button
+                        onClick={handleSearchSubmit}
+                        className="px-6 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 transition-colors"
+                      >
+                        Search Again
+                      </button>
                     </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                      {[...Array(6)].map((_, i) => (
-                        <div key={i} className="p-8 rounded-[40px] bg-white border border-slate-100 shadow-sm h-[400px]">
-                          <div className="flex items-start justify-between mb-8">
-                            <Skeleton className="w-16 h-16 rounded-[22px] bg-slate-50" />
-                            <Skeleton className="w-10 h-10 rounded-2xl bg-slate-50" />
-                          </div>
-                          <Skeleton className="w-3/4 h-6 mb-4 bg-slate-50" />
-                          <Skeleton className="w-1/2 h-4 mb-8 bg-slate-50" />
-                          <div className="space-y-3 mb-10">
-                            <Skeleton className="w-full h-4 bg-slate-50" />
-                            <Skeleton className="w-full h-4 bg-slate-50" />
-                            <Skeleton className="w-2/3 h-4 bg-slate-50" />
-                          </div>
-                          <Skeleton className="w-full h-14 rounded-2xl bg-slate-50" />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Error state */}
-                {error && !isLoading && (
-                  <div className="text-center py-20 bg-rose-50 rounded-[40px] border border-rose-100">
-                    <p className="text-rose-600 font-bold text-lg">{error}</p>
-                    <button onClick={handleSearchSubmit} className="mt-4 text-sm font-bold text-rose-500 hover:text-rose-700 underline underline-offset-4">
-                      Try again
-                    </button>
-                  </div>
-                )}
-
-                {/* Results grid */}
-                {!isLoading && displayedJobs.length > 0 && (
-                  <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                      {displayedJobs.map((job, index) => (
-                        <JobCard 
-                          key={job.id} 
-                          job={job} 
-                          index={index} 
-                          onApply={() => handleViewJob(job)}
-                          onApplyNow={() => handleApplyNow(job)}
-                          isLocked={planTier === 'free'}
-                          onUpgradeClick={handleUpgradePrompt}
-                          matchSkills={selectedResume?.content?.skills || []}
-                        />
-                      ))}
-                    </div>
-                    {hasHiddenJobs && (
-                      <div className="mt-12 p-8 rounded-3xl bg-gradient-to-r from-slate-900 to-blue-900 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-2xl relative overflow-hidden">
-                        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none" />
-                        <div className="relative z-10 text-center sm:text-left">
-                          <h4 className="text-2xl font-black text-white mb-2">Unlock {searchResults.length - displayLimit} more matching jobs!</h4>
-                          <p className="text-blue-200 font-medium max-w-md">You've reached the job search limit for your current plan. Upgrade your account to see all matches and apply instantly.</p>
-                        </div>
-                        <button
-                          onClick={handleUpgradePrompt}
-                          className="relative z-10 whitespace-nowrap px-8 py-4 rounded-2xl bg-white text-slate-900 font-black hover:bg-blue-50 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-black/20"
-                        >
-                          Upgrade Now
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {!isLoading && !error && searchResults.length === 0 && (
-                  <div className="text-center py-32 bg-white rounded-[40px] border border-slate-200">
-                    <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                      <SearchIcon className="w-10 h-10 text-slate-200" />
-                    </div>
-                    <h3 className="text-2xl font-bold text-slate-900 mb-2">No direct matches found</h3>
-                    <p className="text-slate-500 max-w-sm mx-auto font-medium">
-                      Try adjusting your resume skills or search manually for broader results.
-                    </p>
-                  </div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Right Sidebar: Selected Resume Completeness & Recent Activity */}
+          <div className="lg:col-span-4 space-y-6 sticky top-24">
+            <ResumeCompletenessSidebar resume={selectedResume} />
+          </div>
         </div>
+
+        {/* Apply Options Modal (Manual vs AI Agent) */}
+        <ApplyModal
+          isOpen={isApplyModalOpen}
+          onClose={() => setIsApplyModalOpen(false)}
+          job={selectedApplyJob}
+          selectedResume={selectedResume}
+          onApplicationStarted={(appId, status) => {
+            if (selectedApplyJob) {
+              const applyUrl = selectedApplyJob.job_url || selectedApplyJob.applyLink || "";
+              const cleanUrl = applyUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
+              const optimistic = {
+                id: appId,
+                status: status || "queued",
+                missingFields: [],
+              };
+              setUserApplicationsMap((prev) => ({
+                ...prev,
+                [selectedApplyJob.id]: optimistic,
+                [applyUrl]: optimistic,
+                [cleanUrl]: optimistic,
+              }));
+            }
+            loadUserApplications();
+          }}
+        />
+
+        {/* Inline Missing Fields Modal */}
+        <MissingFieldsModal
+          isOpen={isMissingFieldsModalOpen}
+          onClose={() => setIsMissingFieldsModalOpen(false)}
+          applicationId={activeMissingAppId}
+          missingFields={activeMissingFields}
+          onSuccess={() => {
+            loadUserApplications();
+          }}
+        />
 
         {/* Upgrade Modal */}
         <UpgradeModal
@@ -605,22 +751,10 @@ function JobsPageContent() {
           onClose={() => setIsUpgradeModalOpen(false)}
           targetTier={upgradeTargetTier}
           reason={
-            upgradeTargetTier === 'enterprise'
-              ? "You've reached your Pro job limit. Upgrade to Enterprise for unlimited matches."
-              : "Free users have limited job search visibility and cannot apply. Upgrade to Pro!"
+            upgradeTargetTier === 'unlimited'
+              ? "You've reached your Pro job limit. Upgrade to Unlimited Plan for unlimited search matches and applications."
+              : "Free users have limited job search visibility. Upgrade to Pro for 18 results and full application access!"
           }
-        />
-
-        {/* Extension Promo Modal */}
-        <ExtensionPromoModal
-          isOpen={isPromoModalOpen}
-          onClose={() => setIsPromoModalOpen(false)}
-          onContinue={() => {
-            setIsPromoModalOpen(false);
-            if (pendingJobToApply) {
-              processApplication(pendingJobToApply);
-            }
-          }}
         />
       </div>
     </DashboardLayout>

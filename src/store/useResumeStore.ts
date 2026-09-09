@@ -163,21 +163,29 @@ const normalizeResumeData = (data: any): ResumeData => {
       id: ensureUniqueId(edu.id, seenEdu),
       school: edu.school || "",
       degree: edu.degree || "",
-      year: edu.year || "",
+      year: edu.year || edu.dates || "",
     })),
-    skills: Array.isArray(data.skills) ? data.skills : [],
+    skills: Array.isArray(data.skills)
+      ? data.skills
+      : typeof data.skills === "string"
+      ? data.skills.split(",").map((s: string) => s.trim()).filter(Boolean)
+      : [],
     projects: (data.projects || []).map((proj: any) => ({
       id: ensureUniqueId(proj.id, seenProj),
       name: proj.name || "",
       description: proj.description || "",
-      technologies: Array.isArray(proj.technologies) ? proj.technologies : [],
+      technologies: Array.isArray(proj.technologies)
+        ? proj.technologies
+        : typeof proj.technologies === "string"
+        ? proj.technologies.split(",").map((t: string) => t.trim()).filter(Boolean)
+        : [],
       link: proj.link || "",
     })),
     certifications: (data.certifications || []).map((cert: any) => ({
       id: ensureUniqueId(cert.id, seenCert),
       name: cert.name || "",
       issuer: cert.issuer || "",
-      date: cert.date || "",
+      date: cert.date || cert.year || "",
       link: cert.link || "",
     })),
     languages: (data.languages || []).map((lang: any) => ({
@@ -366,9 +374,9 @@ export const useResumeStore = create<ResumeState>()(
             if (!user) throw new Error("Not authenticated");
 
             const planTier = useSubscriptionStore.getState().getPlanTier();
-            const maxResumes = planTier === 'enterprise' ? Infinity : (planTier === 'pro' ? 5 : 1);
+            const maxResumes = planTier === 'unlimited' ? Infinity : (planTier === 'pro' ? 5 : 1);
             if (get().userResumes.length >= maxResumes) {
-              throw new Error("PLAN_LIMIT_REACHED");
+              throw new Error(planTier === 'free' ? "PLAN_LIMIT_REACHED_PRO" : "PLAN_LIMIT_REACHED_UNLIMITED");
             }
 
             const normalizedData = normalizeResumeData(data);
@@ -440,9 +448,9 @@ export const useResumeStore = create<ResumeState>()(
             if (!sourceResume) throw new Error("Source resume not found");
 
             const planTier = useSubscriptionStore.getState().getPlanTier();
-            const maxResumes = planTier === 'enterprise' ? Infinity : (planTier === 'pro' ? 5 : 1);
+            const maxResumes = planTier === 'unlimited' ? Infinity : (planTier === 'pro' ? 5 : 1);
             if (state.userResumes.length >= maxResumes) {
-              throw new Error("PLAN_LIMIT_REACHED");
+              throw new Error(planTier === 'free' ? "PLAN_LIMIT_REACHED_PRO" : "PLAN_LIMIT_REACHED_UNLIMITED");
             }
 
             const { data: newResume, error } = await supabase

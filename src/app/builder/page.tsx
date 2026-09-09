@@ -36,7 +36,8 @@ function BuilderContent() {
   const [view, setView] = useState<'list' | 'templates'>('list');
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
-  const [upgradeTargetTier, setUpgradeTargetTier] = useState<'pro' | 'enterprise'>('pro');
+  const [upgradeTargetTier, setUpgradeTargetTier] = useState<'pro' | 'unlimited'>('pro');
+  const [upgradeReason, setUpgradeReason] = useState("");
 
   useEffect(() => {
     fetchUserResumes().then(() => {
@@ -50,11 +51,16 @@ function BuilderContent() {
     if (!isLoading) {
       if (isNew || userResumes.length === 0) {
         const tier = getPlanTier();
-        const maxResumes = tier === 'enterprise' ? Infinity : (tier === 'pro' ? 5 : 1);
+        const maxResumes = tier === 'unlimited' ? Infinity : (tier === 'pro' ? 5 : 1);
         
         if (userResumes.length >= maxResumes) {
           setView('list');
-          setUpgradeTargetTier(tier === 'free' ? 'pro' : 'enterprise');
+          setUpgradeTargetTier(tier === 'free' ? 'pro' : 'unlimited');
+          setUpgradeReason(
+            tier === 'free'
+              ? "The Free plan allows you to create only 1 Resume or CV. Upgrade to Pro Plan to create up to 5 resumes, unlock 25 daily AI applies, and prepare for interviews!"
+              : "You have reached your Pro plan limit of 5 Resumes/CVs. Upgrade to Unlimited Plan to create unlimited resumes!"
+          );
           setIsUpgradeModalOpen(true);
         } else {
           setView('templates');
@@ -75,12 +81,14 @@ function BuilderContent() {
 
     if (tier === 'free' && resumeCount >= 1) {
       setUpgradeTargetTier('pro');
+      setUpgradeReason("The Free plan allows you to create only 1 Resume or CV. Upgrade to Pro Plan to create up to 5 resumes, unlock 25 daily AI applies, and prepare for interviews!");
       setIsUpgradeModalOpen(true);
       return;
     }
     
     if (tier === 'pro' && resumeCount >= 5) {
-      setUpgradeTargetTier('enterprise');
+      setUpgradeTargetTier('unlimited');
+      setUpgradeReason("You have reached your Pro plan limit of 5 Resumes/CVs. Upgrade to Unlimited Plan to create unlimited resumes!");
       setIsUpgradeModalOpen(true);
       return;
     }
@@ -288,6 +296,7 @@ function BuilderContent() {
                           src={template.image}
                           alt={template.name}
                           fill
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                           className="object-cover transition-transform duration-700 group-hover:scale-105"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col items-center justify-end pb-8">
@@ -315,9 +324,10 @@ function BuilderContent() {
           isOpen={isUpgradeModalOpen} 
           onClose={() => setIsUpgradeModalOpen(false)}
           targetTier={upgradeTargetTier}
-          reason={upgradeTargetTier === 'enterprise' 
-            ? "You've reached your Pro limit of 5 resumes." 
-            : "Free users can only create 1 resume."}
+          featureContext="resume_limit"
+          reason={upgradeReason || (upgradeTargetTier === 'unlimited' 
+            ? "You've reached your Pro limit of 5 resumes. Upgrade to Unlimited Plan to continue." 
+            : "Free users can only create 1 resume. Upgrade to Pro Plan to continue.")}
         />
       </div>
     </div>

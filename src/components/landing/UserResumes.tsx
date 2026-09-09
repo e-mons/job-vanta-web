@@ -23,11 +23,15 @@ export default function UserResumes() {
 
   const handleCreateNew = (e: React.MouseEvent) => {
     const tier = getPlanTier();
-    const maxResumes = tier === 'enterprise' ? Infinity : (tier === 'pro' ? 5 : 1);
+    const maxResumes = tier === 'unlimited' ? Infinity : (tier === 'pro' ? 5 : 1);
     
     if (userResumes.length >= maxResumes) {
       e.preventDefault();
-      setUpgradeReason(`You've reached the limit of ${maxResumes} resume${maxResumes === 1 ? '' : 's'} on the ${tier === 'free' ? 'Free' : 'Pro'} plan. Upgrade to continue!`);
+      setUpgradeReason(
+        tier === 'free'
+          ? "The Free plan allows you to create only 1 Resume or CV. Upgrade to Pro Plan to create up to 5 resumes, unlock 25 daily AI applies, and prepare for interviews!"
+          : "You have reached your Pro plan limit of 5 Resumes/CVs. Upgrade to Unlimited Plan to create unlimited resumes!"
+      );
       setIsUpgradeModalOpen(true);
     }
   };
@@ -35,10 +39,14 @@ export default function UserResumes() {
   const handleDuplicate = async (e: React.MouseEvent, id: string, title: string) => {
     e.preventDefault();
     const tier = getPlanTier();
-    const maxResumes = tier === 'enterprise' ? Infinity : (tier === 'pro' ? 5 : 1);
+    const maxResumes = tier === 'unlimited' ? Infinity : (tier === 'pro' ? 5 : 1);
 
     if (userResumes.length >= maxResumes) {
-      setUpgradeReason(`You've reached the limit of ${maxResumes} resume${maxResumes === 1 ? '' : 's'} on the ${tier === 'free' ? 'Free' : 'Pro'} plan. Upgrade to continue!`);
+      setUpgradeReason(
+        tier === 'free'
+          ? "The Free plan allows you to create only 1 Resume or CV. Upgrade to Pro Plan to create up to 5 resumes, unlock 25 daily AI applies, and prepare for interviews!"
+          : "You have reached your Pro plan limit of 5 Resumes/CVs. Upgrade to Unlimited Plan to create unlimited resumes!"
+      );
       setIsUpgradeModalOpen(true);
       return;
     }
@@ -165,12 +173,19 @@ export default function UserResumes() {
                 Your professional profile is ready for new opportunities. Keep it updated for better AI matching.
               </p>
 
-              <div className="flex items-center gap-3 mt-auto">
+              <div className="flex items-center gap-2.5 mt-auto">
                 <Link 
                   href={`/builder/edit?id=${resume.id}`} 
-                  className="flex-1 py-4 px-6 rounded-2xl bg-blue-600 text-white font-bold text-sm text-center hover:bg-blue-700 shadow-xl shadow-blue-600/10 transition-all active:scale-95"
+                  className="flex-1 py-3.5 px-4 rounded-2xl bg-blue-600 text-white font-bold text-xs text-center hover:bg-blue-700 shadow-lg shadow-blue-600/10 transition-all active:scale-95"
                 >
                   Edit Profile
+                </Link>
+                <Link
+                  href={`/resumes/${resume.id}`}
+                  title="View Dedicated Resume"
+                  className="py-3.5 px-3.5 rounded-2xl border border-slate-200 text-slate-700 hover:text-blue-600 hover:bg-blue-50/70 font-bold text-xs text-center transition-all active:scale-95"
+                >
+                  View
                 </Link>
                 <button
                   onClick={(e) => handleDuplicate(e, resume.id, resume.title)}
@@ -253,6 +268,14 @@ export default function UserResumes() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <UpgradeModal
+        isOpen={isUpgradeModalOpen}
+        onClose={() => setIsUpgradeModalOpen(false)}
+        targetTier={getPlanTier() === 'free' ? 'pro' : 'unlimited'}
+        featureContext="resume_limit"
+        reason={upgradeReason}
+      />
     </div>
   );
 }

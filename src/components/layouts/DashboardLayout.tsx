@@ -3,6 +3,8 @@
 import DashboardSidebar from "@/components/navigation/DashboardSidebar";
 import MobileBottomNav from "@/components/navigation/MobileBottomNav";
 import DashboardHeader from "@/components/navigation/DashboardHeader";
+import LiveAgentTrackerModal from "@/components/jobs/LiveAgentTrackerModal";
+import FloatingApplicationDock from "@/components/jobs/FloatingApplicationDock";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -15,6 +17,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </main>
       </div>
       <MobileBottomNav />
+      {/* Global Live AI Agent Application Tracker & Minimized Dock */}
+      <LiveAgentTrackerModal />
+      <FloatingApplicationDock />
     </div>
   );
 }

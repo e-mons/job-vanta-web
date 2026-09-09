@@ -15,15 +15,39 @@ export async function POST() {
 
     const { data: subscription } = await supabase
       .from('subscriptions')
-      .select('dodo_customer_id')
+      .select('dodo_customer_id, status, plan_id')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
-    if (!subscription?.dodo_customer_id) {
-      return NextResponse.json({ error: "No active subscription found. Please subscribe to a plan first." }, { status: 400 });
+    let customerId = subscription?.dodo_customer_id;
+
+    // Fallback: If no customer ID saved yet, attempt lookup by user email
+    if (!customerId && user.email) {
+      try {
+        const customersList = await dodo.customers.list({ email: user.email });
+        const matched = customersList.items?.find((c: any) => c.email?.toLowerCase() === user.email?.toLowerCase());
+        if (matched?.customer_id) {
+          customerId = matched.customer_id;
+          await supabase
+            .from('subscriptions')
+            .update({ dodo_customer_id: customerId })
+            .eq('user_id', user.id);
+        }
+      } catch (lookupErr: any) {
+        console.warn("[Portal] Customer lookup warning:", lookupErr.message);
+      }
     }
 
-    const portalSession = await dodo.customers.customerPortal.create(subscription.dodo_customer_id);
+    if (!customerId) {
+      return NextResponse.json({ 
+        error: "No active billing profile found. Please subscribe to a Pro or Unlimited plan first." 
+      }, { status: 400 });
+    }
+
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const portalSession = await dodo.customers.customerPortal.create(customerId, {
+      return_url: `${siteUrl}/dashboard/billing`,
+    });
 
     return NextResponse.json({ url: portalSession.link });
   } catch (err: any) {

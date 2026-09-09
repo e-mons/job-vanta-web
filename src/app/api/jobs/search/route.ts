@@ -1,415 +1,644 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import { GoogleGenAI } from "@google/genai";
-import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
+import crypto from "crypto";
 
 export const maxDuration = 60;
 
-const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
-const ai = new GoogleGenAI({ apiKey });
+const BRAVE_API_KEY = process.env.BRAVE_SEARCH_API_KEY?.trim() || "";
+const MIN_INTERVAL_MS = parseInt(process.env.BRAVE_SEARCH_MIN_INTERVAL_MS || "1100", 10);
 
-// In-Memory Search Cache (1 Min TTL)
-const searchCache = new Map<string, { timestamp: number; jobs: any[]; queryStr: string }>();
-const CACHE_TTL_MS = 60 * 1000;
+// Global timestamp to guarantee rate-limit spacing across sequential Brave API calls
+let lastBraveCallTime = 0;
 
-// Verified active models (tested 2026-07-29)
-const MODELS = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"];
+async function throttleBraveCall(): Promise<void> {
+  const now = Date.now();
+  const elapsed = now - lastBraveCallTime;
+  if (elapsed < MIN_INTERVAL_MS) {
+    await new Promise((resolve) => setTimeout(resolve, MIN_INTERVAL_MS - elapsed));
+  }
+  lastBraveCallTime = Date.now();
+}
 
-const rapidApiKey = process.env.RAPIDAPI_KEY?.trim() || "";
-const openWebNinjaKey = process.env.OPENWEBNINJA_KEY?.trim() || "";
+export type SupportedPlatform = "greenhouse" | "lever" | "workable" | "wellfound";
 
-// Job Schema
-const JobSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  company: z.string(),
-  companyLogo: z.string().nullable().optional(),
-  companyDescription: z.string().nullable().optional(),
-  location: z.string(),
-  isRemote: z.boolean(),
-  salary: z.string().nullable().optional(),
-  contactEmail: z.string().nullable().optional(),
-  applyLink: z.string(),
-  description: z.string(),
-  type: z.string(),
-  employmentType: z.string().nullable().optional(),
-  source: z.string(),
-  postedAt: z.string(),
-  skills: z.array(z.string()).default([]),
-  responsibilities: z.array(z.string()).optional(),
-  qualifications: z.array(z.string()).optional(),
-  benefits: z.array(z.string()).optional(),
-});
+interface BraveSearchResultItem {
+  title: string;
+  url: string;
+  description?: string;
+  age?: string;
+  page_age?: string;
+  profile?: {
+    name?: string;
+    long_name?: string;
+    img?: string;
+  };
+}
+
+interface ParsedJobMetadata {
+  title: string;
+  company: string;
+  companyLogo: string;
+  location: string;
+  salary: string | null;
+  jobType: string;
+  experienceLevel: string;
+  description: string;
+  tags: string[];
+  matchScore: number;
+  jobUrl: string;
+  sourceUrl: string;
+  platform: SupportedPlatform;
+}
 
 /**
- * Call Gemini with model fallback — inline, no shared utility dependency
+ * Clean HTML entities and bold tags returned in search snippets
  */
-async function callGemini(prompt: string): Promise<string> {
-  let lastError: any;
-  for (const model of MODELS) {
-    try {
-      const response = await ai.models.generateContent({
-        model,
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-      });
-      const text = response.text;
-      if (text && text.trim()) return text;
-    } catch (err: any) {
-      lastError = err;
-      const msg: string = err?.message ?? "";
-      if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED")) {
-        throw new Error("AI quota exceeded. Please try again in a moment.");
-      }
-      console.warn(`[JobSearch] Model ${model} failed: ${msg}`);
+function cleanSnippetText(text: string): string {
+  return text
+    .replace(/<[^>]*>/g, "")
+    .replace(/&#x27;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Parse clean Job Title and Company Name from platform-specific search titles
+ */
+function parseTitleAndCompany(rawTitle: string, platform: SupportedPlatform, url: string): { title: string; company: string } {
+  let clean = cleanSnippetText(rawTitle);
+
+  // Platform specific cleanups
+  if (platform === "greenhouse") {
+    // "Job Application for Senior Frontend Engineer at Re:Build Manufacturing"
+    const m1 = clean.match(/^Job Application for (.+?) at (.+?)(?: - Greenhouse)?$/i);
+    if (m1) return { title: m1[1].trim(), company: m1[2].trim() };
+
+    // "[Company] - [Role]"
+    const m2 = clean.match(/^(.+?)\s*-\s*(.+?)(?: \| Greenhouse)?$/i);
+    if (m2 && !m2[1].toLowerCase().includes("job application")) {
+      return { company: m2[1].trim(), title: m2[2].trim() };
+    }
+
+    // "[Role] at [Company]"
+    const m3 = clean.match(/^(.+?)\s+at\s+(.+?)(?: \| Greenhouse)?$/i);
+    if (m3) return { title: m3[1].trim(), company: m3[2].trim() };
+  } else if (platform === "lever") {
+    // "Jobgether - AEM - Technical Lead / Frontend development Lead"
+    // "CoderPad - Senior Software Engineer, Fullstack"
+    const parts = clean.split(" - ");
+    if (parts.length >= 2) {
+      const company = parts[0].trim();
+      const role = parts.slice(1).join(" - ").replace(/\s*\|.*$/, "").trim();
+      return { company, title: role };
+    }
+  } else if (platform === "workable") {
+    // "Frontend Software Engineer (Typescript) - ALTEN MÉXICO - Application"
+    const cleaned = clean.replace(/\s*-\s*Application$/i, "").replace(/\s*-\s*Workable$/i, "");
+    const parts = cleaned.split(" - ");
+    if (parts.length >= 2) {
+      return { title: parts[0].trim(), company: parts[1].trim() };
+    }
+  } else if (platform === "wellfound") {
+    // "Senior Software Engineer, Front End at Axle Health • Santa Monica | Wellfound"
+    const cleaned = clean.replace(/\s*\|\s*Wellfound$/i, "");
+    const bulletParts = cleaned.split(" • ");
+    const mainPart = bulletParts[0] || cleaned;
+    const m = mainPart.match(/^(.+?)\s+at\s+(.+)$/i);
+    if (m) {
+      return { title: m[1].trim(), company: m[2].trim() };
+    }
+    const dashParts = cleaned.split(" - ");
+    if (dashParts.length >= 2) {
+      return { company: dashParts[0].trim(), title: dashParts[1].trim() };
     }
   }
-  throw lastError ?? new Error("All AI models failed.");
-}
 
-/**
- * Fetch real jobs using JSearch API (RapidAPI)
- */
-async function fetchRealJobs(query: string, location: string, isRemote: boolean = false): Promise<any[]> {
-  if (!openWebNinjaKey && !rapidApiKey) return [];
-  
-  const searchStr = `${query} in ${location} ${isRemote ? 'remote' : ''}`.trim();
-  
-  const isDirect = !!openWebNinjaKey;
-  const url = isDirect 
-    ? `https://api.openwebninja.com/jsearch/search-v2?query=${encodeURIComponent(searchStr)}&page=1&num_pages=1`
-    : `https://jsearch.p.rapidapi.com/search?query=${encodeURIComponent(searchStr)}&page=1&num_pages=1`;
-  
-  const headers: any = isDirect 
-    ? { 'x-api-key': openWebNinjaKey }
-    : {
-        'X-RapidAPI-Key': rapidApiKey,
-        'X-RapidAPI-Host': 'jsearch.p.rapidapi.com'
-      };
-  
+  // Generic fallback if patterns did not catch
+  const dashSplit = clean.split(" - ");
+  if (dashSplit.length >= 2) {
+    return { title: dashSplit[0].trim(), company: dashSplit[1].replace(/\|.*$/, "").trim() };
+  }
+
+  // Extract company domain from URL if available
   try {
-    const res = await fetch(url, { headers });
-    
-    if (!res.ok) throw new Error(`JSearch API error: ${res.status}`);
-    
-    const json = await res.json();
-    const jobsArray = Array.isArray(json.data) ? json.data : (json.data?.jobs || []);
-    if (!Array.isArray(jobsArray) || jobsArray.length === 0) return [];
-    
-    return jobsArray.map((job: any) => {
-      return {
-        id: job.job_id || uuidv4(),
-        title: job.job_title || "Unknown Title",
-        company: job.employer_name || "Unknown Company",
-        companyLogo: job.employer_logo || `https://icon.horse/icon/${job.employer_website?.replace(new RegExp('^https?://'), '') || 'company.com'}`,
-        companyDescription: null,
-        location: `${job.job_city || ''}, ${job.job_state || ''}, ${job.job_country || ''}`.replace(/^, | ,|, $/g, '').trim() || location,
-        isRemote: job.job_is_remote || isRemote,
-        salary: job.job_min_salary ? `$${job.job_min_salary}k - $${job.job_max_salary}k` : null,
-        contactEmail: null,
-        applyLink: job.apply_options?.find((o: any) => o.is_direct)?.apply_link || job.job_apply_link || job.job_google_link || "https://google.com",
-        description: job.job_description || "No description provided.",
-        type: job.job_employment_type || "Full-time",
-        employmentType: job.job_employment_type || "Full-time",
-        source: "JSearch Verified",
-        postedAt: job.job_posted_at_datetime_utc || new Date().toISOString(),
-        skills: [], // We can't perfectly extract these yet without LLM
-        responsibilities: [],
-        qualifications: [],
-        benefits: []
-      };
-    });
-  } catch (err: any) {
-    console.error("[JobSearch] RapidAPI fetch failed:", err.message);
-    return [];
+    const parsedUrl = new URL(url);
+    const pathParts = parsedUrl.pathname.split("/").filter(Boolean);
+    const guessedCompany = pathParts[0] || "Leading Tech Company";
+    return {
+      title: clean.replace(/\s*\|.*$/, "").trim() || "Software Engineer",
+      company: guessedCompany.charAt(0).toUpperCase() + guessedCompany.slice(1),
+    };
+  } catch {
+    return { title: clean || "Software Opportunity", company: "Innovative Company" };
   }
 }
 
 /**
- * Fetch real remote tech jobs from Remotive API as a reliable fallback
+ * Extract salary from snippet or null
  */
-async function fetchRemotiveJobs(query: string): Promise<any[]> {
-  try {
-    const searchStr = query.split(' ')[0] || "software"; // Remotive search is best with single keyword
-    const url = `https://remotive.com/api/remote-jobs?search=${encodeURIComponent(searchStr)}&limit=15`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Remotive API error: ${res.status}`);
-    const json = await res.json();
-    
-    if (!json.jobs || !Array.isArray(json.jobs)) return [];
-    
-    return json.jobs.map((job: any) => ({
-      id: `remotive-${job.id || uuidv4()}`,
-      title: job.title || "Unknown Title",
-      company: job.company_name || "Unknown Company",
-      companyLogo: job.company_logo || `https://icon.horse/icon/${job.company_name?.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'company'}.com`,
-      companyDescription: null,
-      location: job.candidate_required_location || "Remote Worldwide",
-      isRemote: true,
-      salary: job.salary || null,
-      contactEmail: null,
-      applyLink: job.url || "https://remotive.com",
-      description: job.description || "No description provided.",
-      type: job.job_type ? job.job_type.replace('_', '-') : "Full-time",
-      employmentType: job.job_type ? job.job_type.replace('_', '-') : "Full-time",
-      source: "Remotive Verified",
-      postedAt: job.publication_date || new Date().toISOString(),
-      skills: job.tags || [],
-      responsibilities: [],
-      qualifications: [],
-      benefits: []
-    }));
-  } catch (err: any) {
-    console.error("[JobSearch] Remotive fetch failed:", err.message);
-    return [];
-  }
+function extractSalary(snippet: string): string | null {
+  const salaryRegex = /\$\d{2,3}(?:,\d{3})*(?:k|K)?(?:\s*-\s*\$\d{2,3}(?:,\d{3})*(?:k|K)?)?(?:\s*(?:\/|per)\s*(?:yr|year|hr|hour|mo|month))?/;
+  const match = snippet.match(salaryRegex);
+  if (match) return match[0];
+  return null;
 }
 
 /**
- * Resolve target location from filters, body params, or Vercel/CF geo headers
+ * Deterministic match score calculation based on candidate skills and role keywords
  */
-function resolveTargetLocation(
-  filters: any,
-  locationParam?: string,
-  bodyUserLoc?: string,
-  reqHeaders?: Headers
-): string {
-  if (filters?.location?.trim()) return filters.location.trim();
-  if (locationParam?.trim()) return locationParam.trim();
-  if (bodyUserLoc?.trim()) return bodyUserLoc.trim();
+function calculateMatchScore(
+  jobTitle: string,
+  description: string,
+  candidateSkills: string[],
+  targetRole: string
+): { score: number; tags: string[] } {
+  const combined = `${jobTitle} ${description}`.toLowerCase();
+  const matchedTags: string[] = [];
 
-  if (reqHeaders) {
-    const city = reqHeaders.get("x-vercel-ip-city") || reqHeaders.get("cf-ipcity");
-    const country = reqHeaders.get("x-vercel-ip-country") || reqHeaders.get("cf-ipcountry");
-    if (city && country) return `${city}, ${country}`;
-  }
-
-  return "Local Tech Hub (Nearest)";
-}
-
-/**
- * Location-aware fallback jobs — used if AI call fails or times out
- */
-function generateFallbackJobs(
-  skills: string[] = [],
-  query: string = "",
-  location: string = "",
-  filters: any = {},
-  targetLoc: string = "Nearest Tech Hub"
-) {
-  const targetRole = query || (skills.length > 0 ? `${skills[0]} Specialist` : "Software Engineer");
-  const isRemoteOnly = !!filters?.isRemote;
-  const activeLocation = isRemoteOnly ? "100% Remote" : targetLoc;
-
-  const baseCompanies = [
-    { name: "Stripe", domain: "stripe.com", bg: "Fintech infrastructure platform for internet payments." },
-    { name: "Vercel", domain: "vercel.com", bg: "Frontend cloud platform for Next.js and web applications." },
-    { name: "Supabase", domain: "supabase.com", bg: "Open-source Firebase alternative powered by Postgres." },
-    { name: "Linear", domain: "linear.app", bg: "Purpose-built tool for modern software product development." },
-    { name: "Figma", domain: "figma.com", bg: "Collaborative design and interface creation platform." },
-    { name: "OpenAI", domain: "openai.com", bg: "AI research and deployment company developing ChatGPT." },
-    { name: "Datadog", domain: "datadoghq.com", bg: "Monitoring and analytics platform for cloud-scale infrastructure." },
-    { name: "Snowflake", domain: "snowflake.com", bg: "AI Data Cloud platform enabling unified data architecture." },
-    { name: "Airbnb", domain: "airbnb.com", bg: "Global marketplace for vacation rentals and travel experiences." },
-    { name: "Anthropic", domain: "anthropic.com", bg: "AI safety and research company building reliable AI models." },
-    { name: "Notion", domain: "notion.so", bg: "Connected workspace for docs, wikis, and project management." },
-    { name: "Postman", domain: "postman.com", bg: "API platform for building, testing, and managing APIs." },
+  const commonTech = [
+    "React", "Next.js", "TypeScript", "JavaScript", "Node.js", "Python", 
+    "Go", "Rust", "Java", "AWS", "GCP", "PostgreSQL", "GraphQL", "Docker",
+    "Tailwind", "System Design", "Microservices", "REST API", "CI/CD", "Vue"
   ];
 
-  const topTechCompanies = [...baseCompanies].sort(() => Math.random() - 0.5);
+  // Check candidate skills first
+  for (const s of candidateSkills) {
+    if (combined.includes(s.toLowerCase().trim())) {
+      matchedTags.push(s);
+    }
+  }
 
-  const now = new Date();
+  // Supplement with common tech from job description
+  for (const t of commonTech) {
+    if (matchedTags.length >= 6) break;
+    if (combined.includes(t.toLowerCase()) && !matchedTags.some(m => m.toLowerCase() === t.toLowerCase())) {
+      matchedTags.push(t);
+    }
+  }
 
-  return topTechCompanies.map((comp, idx) => {
-    const daysAgo = (idx % 3) + 1;
-    const postedDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000).toISOString();
-    const candidateSkills = Array.from(
-      new Set([...skills, "TypeScript", "React", "Node.js", "System Design", "Cloud Infrastructure"])
-    ).slice(0, 6);
+  if (matchedTags.length === 0) {
+    matchedTags.push(...candidateSkills.slice(0, 3));
+  }
 
-    const titlePrefixes = ["Senior", "Lead", "Staff", "Principal", "Senior Full-Stack"];
-    const prefix = titlePrefixes[idx % titlePrefixes.length];
-    const jobTitle =
-      idx === 0
-        ? targetRole
-        : `${prefix} ${targetRole.replace(/^(Senior|Lead|Staff|Junior|Principal)\s+/i, "")}`;
+  // Calculate score between 75% and 98%
+  let baseScore = 75;
+  if (targetRole && combined.includes(targetRole.toLowerCase())) {
+    baseScore += 10;
+  }
+  const skillBonus = Math.min(13, matchedTags.length * 3);
+  const finalScore = Math.min(98, baseScore + skillBonus);
 
-    const jobLoc = isRemoteOnly
-      ? "100% Remote"
-      : idx % 3 === 0
-      ? `Remote (${activeLocation})`
-      : activeLocation;
-
-    return {
-      id: uuidv4(),
-      title: jobTitle,
-      company: comp.name,
-      companyLogo: `https://icon.horse/icon/${comp.domain}`,
-      companyDescription: comp.bg,
-      location: jobLoc,
-      isRemote: isRemoteOnly || idx % 3 === 0,
-      salary: `$${115 + idx * 8}k - $${160 + idx * 10}k / year`,
-      contactEmail: `careers@${comp.domain}`,
-      applyLink: `https://${comp.domain}/careers`,
-      description: `We are looking for a highly skilled ${jobTitle} located in or available to work with our team in ${activeLocation}. In this role, you will design, architect, and deliver mission-critical features using modern web technologies.\n\nYou will work closely with cross-functional engineering teams to build scalable, high-performance systems.`,
-      type: filters?.jobType || "Full-time",
-      employmentType: filters?.jobType || "Full-time",
-      source: "JobVanta Direct Verified",
-      postedAt: postedDate,
-      skills: candidateSkills,
-      responsibilities: [
-        `Architect and maintain core features and scalable web services for ${comp.name}`,
-        "Collaborate closely with product managers and designers to translate product vision into code",
-        "Write clean, well-tested, maintainable code with high performance and accessibility in mind",
-        "Perform code reviews and mentor junior and mid-level software engineers",
-        "Optimize system latency, web vitals, and database query performance",
-      ],
-      qualifications: [
-        "3+ years of professional experience building modern software applications",
-        `Strong expertise in ${candidateSkills.slice(0, 3).join(", ")}`,
-        "Proven track record of shipping production-grade applications with high user satisfaction",
-        "Solid understanding of RESTful APIs, modern databases, and state management",
-        "Excellent communication and collaboration skills in remote or hybrid teams",
-      ],
-      benefits: [
-        "Competitive salary + top-tier equity package",
-        "100% employer-covered Health, Dental & Vision insurance",
-        "Flexible PTO + Paid Parental Leave",
-        "$2,500 annual home office & learning stipend",
-        "401(k) matching up to 5%",
-      ],
-    };
-  });
+  return { score: finalScore, tags: matchedTags.slice(0, 6) };
 }
+
+/**
+ * Call Brave Search API with throttling and query formatting
+ */
+async function searchBravePlatform(
+  siteQuery: string,
+  keywords: string,
+  freshness = "pw",
+  count = 10
+): Promise<BraveSearchResultItem[]> {
+  if (!BRAVE_API_KEY) {
+    console.warn("[JobSearch] BRAVE_SEARCH_API_KEY is not configured!");
+    return [];
+  }
+
+  await throttleBraveCall();
+
+  const fullQuery = `${siteQuery} ${keywords}`.trim();
+  const params = new URLSearchParams({
+    q: fullQuery,
+    count: count.toString(),
+    freshness: freshness,
+  });
+
+  const url = `https://api.search.brave.com/res/v1/web/search?${params.toString()}`;
+
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        "X-Subscription-Token": BRAVE_API_KEY,
+        Accept: "application/json",
+      },
+    });
+
+    if (!res.ok) {
+      console.warn(`[JobSearch] Brave API returned HTTP ${res.status} for query: ${fullQuery}`);
+      return [];
+    }
+
+    const data = await res.json();
+    return data.web?.results || [];
+  } catch (err: any) {
+    console.error("[JobSearch] Brave Search error:", err.message);
+    return [];
+  }
+}
+
+/**
+ * Platform site queries
+ */
+const PLATFORM_SITES: Record<SupportedPlatform, string> = {
+  greenhouse: "site:job-boards.greenhouse.io OR site:boards.greenhouse.io",
+  lever: "site:jobs.lever.co",
+  workable: "site:apply.workable.com",
+  wellfound: "site:wellfound.com/jobs",
+};
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { query, location, skills, filters, userLocation, detectedLocation } = body;
+    const {
+      resumeId,
+      resumeData,
+      skills = [],
+      filters = {},
+      platforms = ["greenhouse", "lever", "workable", "wellfound"],
+      query = "",
+    } = body;
 
-    const targetLocation = resolveTargetLocation(
-      filters,
-      location,
-      userLocation || detectedLocation,
-      req.headers
-    );
-
-    // 1. Cache check
-    const sortedSkills = Array.isArray(skills) ? [...skills].sort() : [];
-    const cacheKey = JSON.stringify({
-      query: query || "",
-      location: targetLocation,
-      skills: sortedSkills,
-      filters: filters || {},
-      realJobsOnly: true
-    });
-
-    if (searchCache.has(cacheKey)) {
-      const cachedEntry = searchCache.get(cacheKey)!;
-      if (Date.now() - cachedEntry.timestamp < CACHE_TTL_MS) {
-        console.log("[JobSearch] Cache hit for:", targetLocation);
-        return NextResponse.json({
-          success: true,
-          jobs: cachedEntry.jobs,
-          query: cachedEntry.queryStr,
-          targetLocation,
-          cached: true,
-        });
-      }
-    }
-
-    // JSearch queries fail if they are too long/specific.
-    // Start with a reasonable base query: User's typed query, OR top 2 skills, OR generic "Jobs"
-    const displayQuery = query || (sortedSkills.length > 0 ? sortedSkills.slice(0, 2).join(" ") : "Jobs");
-    let validatedJobs: any[] = [];
-
-    // Prioritize REAL jobs via RapidAPI JSearch
-    console.log(`[JobSearch] Fetching real jobs for "${displayQuery}" in "${targetLocation}"`);
-    
-    if (openWebNinjaKey || rapidApiKey) {
-      let searchLoc = targetLocation;
-      if (searchLoc === "Local Tech Hub (Nearest)") searchLoc = "";
-      
-      // 1. Initial Strict Search (Location + Top 2 Skills)
-      let realJobs = await fetchRealJobs(displayQuery, searchLoc, filters?.isRemote);
-      
-      // 2. Broad Search (Country/Remote + Top Skill)
-      if (!realJobs || realJobs.length === 0) {
-        let broaderLocation = "Remote";
-        if (searchLoc.includes(',')) broaderLocation = searchLoc.split(',').pop()?.trim() || "Remote";
-        
-        const broaderQuery = sortedSkills.length > 0 ? sortedSkills[0] : displayQuery;
-        
-        console.log(`[JobSearch] Broadening search to: "${broaderQuery}" in "${broaderLocation}"`);
-        realJobs = await fetchRealJobs(broaderQuery, broaderLocation, filters?.isRemote);
-      }
-
-      // 3. The Ultimate Global Fallback
-      if (!realJobs || realJobs.length === 0) {
-        console.log(`[JobSearch] Still no matches. Searching for generic "Software" globally`);
-        realJobs = await fetchRealJobs(query || "Software", "", false);
-      }
-
-      if (realJobs && realJobs.length > 0) {
-        validatedJobs = realJobs;
-      } else {
-        console.warn(`[JobSearch] JSearch returned 0 results even after expanding location and query.`);
-      }
-    } else {
-      console.warn("[JobSearch] No RAPIDAPI_KEY configured. Cannot fetch real jobs.");
-    }
-
-    // 4. Reliable Remotive API Fallback
-    if (validatedJobs.length === 0) {
-      console.log(`[JobSearch] JSearch failed or empty. Falling back to Remotive API for "${displayQuery}"`);
-      validatedJobs = await fetchRemotiveJobs(displayQuery);
-    }
-
-    // Apply Pricing Plan Limits
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    let maxJobs = 6; // Free plan limit
-    if (user) {
-      const { data: sub } = await supabase
-        .from('subscriptions')
-        .select('plan_id, status')
-        .eq('user_id', user.id)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    // 1. Resolve Resume Data (fetch from DB if ID passed without inline content)
+    let candidateSkills: string[] = Array.isArray(skills) ? skills : [];
+    let candidateRole = query || "";
+    let candidateLocation = filters?.location || "";
+    let resumeRecord: any = null;
+
+    if (user && resumeId) {
+      const { data: dbResume } = await supabase
+        .from("resumes")
+        .select("*")
+        .eq("id", resumeId)
+        .eq("user_id", user.id)
         .single();
-        
-      if (sub && (sub.status === 'active' || sub.status === 'trialing')) {
-        if (sub.plan_id === 'enterprise' || sub.plan_id === 'pdt_0NewgKeXYMkBEofXpxy9Z') {
-          maxJobs = Infinity;
-        } else if (sub.plan_id === 'pro' || sub.plan_id === 'pdt_0Newfu26VwAPCKJBoT8z5') {
-          maxJobs = 18;
+
+      if (dbResume) {
+        resumeRecord = dbResume;
+        const content = dbResume.content || {};
+        if (candidateSkills.length === 0 && Array.isArray(content.skills)) {
+          candidateSkills = content.skills;
+        }
+        if (!candidateRole) {
+          // Derive role from experience or summary
+          const latestExp = content.experience?.[0];
+          if (latestExp?.role) {
+            candidateRole = latestExp.role;
+          }
+        }
+        if (!candidateLocation && content.personalInfo?.location) {
+          candidateLocation = content.personalInfo.location;
         }
       }
     }
-    
-    // Slice jobs according to plan limit
-    if (maxJobs !== Infinity) {
-      validatedJobs = validatedJobs.slice(0, maxJobs);
+
+    // Fallback to inline resumeData if passed
+    if (!resumeRecord && resumeData?.content) {
+      const content = resumeData.content;
+      if (candidateSkills.length === 0 && Array.isArray(content.skills)) {
+        candidateSkills = content.skills;
+      }
+      if (!candidateRole && content.experience?.[0]?.role) {
+        candidateRole = content.experience[0].role;
+      }
+      if (!candidateLocation && content.personalInfo?.location) {
+        candidateLocation = content.personalInfo.location;
+      }
     }
 
-    // Save to cache
-    searchCache.set(cacheKey, {
-      timestamp: Date.now(),
-      jobs: validatedJobs, // Caching the sliced array so free users don't get full array on reload
-      queryStr: displayQuery,
-    });
+    if (!candidateRole && candidateSkills.length > 0) {
+      candidateRole = `${candidateSkills[0]} Engineer`;
+    }
+    if (!candidateRole) {
+      candidateRole = "Software Engineer";
+    }
+
+    // 2. Compute Deterministic Search Fingerprint
+    const selectedPlatforms: SupportedPlatform[] = (
+      Array.isArray(platforms) && platforms.length > 0
+        ? platforms
+        : ["greenhouse", "lever", "workable", "wellfound"]
+    ) as SupportedPlatform[];
+
+    selectedPlatforms.sort();
+    const sortedSkills = [...candidateSkills].sort();
+
+    const fingerprintPayload = {
+      resumeId: resumeId || "no_resume",
+      platforms: selectedPlatforms,
+      skills: sortedSkills,
+      location: filters?.location || candidateLocation || "",
+      radius: filters?.radius || "25",
+      isRemote: !!filters?.isRemote,
+      jobType: filters?.jobType || "Full-time",
+      experienceLevel: filters?.experienceLevel || "Mid-level",
+      query: query || "",
+    };
+
+    const searchFingerprint = crypto
+      .createHash("sha256")
+      .update(JSON.stringify(fingerprintPayload))
+      .digest("hex");
+
+    // 3. Check Supabase 6-Hour Cache
+    if (user && resumeId) {
+      const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+
+      const { data: cachedJobs, error: cacheError } = await supabase
+        .from("jobs")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("resume_id", resumeId)
+        .eq("search_fingerprint", searchFingerprint)
+        .gte("fetched_at", sixHoursAgo)
+        .order("match_score", { ascending: false });
+
+      if (!cacheError && cachedJobs && cachedJobs.length > 0) {
+        console.log(`[JobSearch] Returning ${cachedJobs.length} cached jobs (6-hour valid) for fingerprint ${searchFingerprint.slice(0, 8)}`);
+
+        // Check plan limits
+        const maxJobs = await getUserPlanLimit(supabase, user.id);
+        const sliced = maxJobs === Infinity ? cachedJobs : cachedJobs.slice(0, maxJobs);
+
+        return NextResponse.json({
+          success: true,
+          jobs: sliced.map(formatDbJobToStoreJob),
+          cached: true,
+          fetchedAt: cachedJobs[0].fetched_at,
+          total: cachedJobs.length,
+        });
+      }
+
+      // If older than 6 hours or fingerprint changed, clear old cached jobs for this resume to prevent database clutter
+      await supabase
+        .from("jobs")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("resume_id", resumeId);
+    }
+
+    // 4. Multi-Tier Progressive Search via Brave Search API
+    console.log(`[JobSearch] Executing Brave Search across [${selectedPlatforms.join(", ")}] for "${candidateRole}"`);
+
+    let rawResults: { item: BraveSearchResultItem; platform: SupportedPlatform }[] = [];
+    const locationStr = filters?.isRemote ? "Remote" : (candidateLocation ? candidateLocation.split(",")[0].trim() : "Remote");
+    const cleanExpLevel = (filters?.experienceLevel || "").replace(/-level$/i, "").trim();
+    const expKeyword = (cleanExpLevel && cleanExpLevel !== "Mid" && !candidateRole.toLowerCase().includes(cleanExpLevel.toLowerCase())) ? cleanExpLevel : "";
+    const jobTypeKeyword = (filters?.jobType && filters.jobType !== "Full-time") ? `"${filters.jobType}"` : "";
+    const topSkill = candidateSkills[0] ? `"${candidateSkills[0]}"` : "";
+
+    // Tier 1: Platform search with up to 20 results per platform
+    for (const p of selectedPlatforms) {
+      const site = PLATFORM_SITES[p];
+      const primaryKeywords = `"${candidateRole}" ${expKeyword} ${jobTypeKeyword} ${topSkill} ${locationStr}`.replace(/\s+/g, " ").trim();
+      let items = await searchBravePlatform(site, primaryKeywords, "pm", 20);
+
+      // Per-platform resilience: if a platform returns fewer than 5 jobs (due to strict quote constraints),
+      // give it a relaxed query so Lever, Workable, Wellfound also contribute abundant verified jobs
+      if (items.length < 5) {
+        const broadRole = candidateRole.replace(/^(Senior|Junior|Lead|Staff|Principal|Associate)\s+/i, "");
+        const relaxedKeywords = `"${broadRole}" ${expKeyword} ${locationStr}`.replace(/\s+/g, " ").trim();
+        const relaxedItems = await searchBravePlatform(site, relaxedKeywords, "pm", 20);
+        items = [...items, ...relaxedItems];
+      }
+
+      for (const item of items) {
+        rawResults.push({ item, platform: p });
+      }
+    }
+
+    // Tier 2: If low overall results (< 25), widen location / remote search across selected platforms
+    if (rawResults.length < 25) {
+      console.log(`[JobSearch] Tier 1 yielded ${rawResults.length} jobs. Expanding to Tier 2 (Location / Remote widening)...`);
+      for (const p of selectedPlatforms) {
+        const site = PLATFORM_SITES[p];
+        const tier2Keywords = `${candidateRole} ${candidateSkills[0] || ""} Remote`.trim();
+        const items = await searchBravePlatform(site, tier2Keywords, "pm", 20);
+        for (const item of items) {
+          if (!rawResults.some(r => r.item.url === item.url)) {
+            rawResults.push({ item, platform: p });
+          }
+        }
+      }
+    }
+
+    // Tier 3: If still low results (< 25), widen skill & role keywords across platforms
+    if (rawResults.length < 25) {
+      console.log(`[JobSearch] Expanding to Tier 3 (Skill & Tech Stack Widening)...`);
+      const coreSkill = candidateSkills[0] || "Software";
+      for (const p of selectedPlatforms) {
+        const site = PLATFORM_SITES[p];
+        const tier3Keywords = `${coreSkill} Developer Remote`.trim();
+        const items = await searchBravePlatform(site, tier3Keywords, "pm", 20);
+        for (const item of items) {
+          if (!rawResults.some(r => r.item.url === item.url)) {
+            rawResults.push({ item, platform: p });
+          }
+        }
+      }
+    }
+
+    // Tier 4: The Ultimate Guarantee — Global platform engineering search
+    if (rawResults.length < 15) {
+      console.log(`[JobSearch] Tier 4: Global platform tech opportunity guarantee...`);
+      for (const p of selectedPlatforms) {
+        const site = PLATFORM_SITES[p];
+        const tier4Keywords = "Software Engineer Remote";
+        const items = await searchBravePlatform(site, tier4Keywords, "pm", 20);
+        for (const item of items) {
+          if (!rawResults.some(r => r.item.url === item.url)) {
+            rawResults.push({ item, platform: p });
+          }
+        }
+      }
+    }
+
+    // 5. Deduplicate and Normalize Results
+    const seenUrls = new Set<string>();
+    const normalizedJobs: any[] = [];
+
+    // Preload user's saved and applied jobs to reflect status accurately
+    const userSavedUrlSet = new Set<string>();
+    const userAppliedUrlSet = new Set<string>();
+
+    if (user) {
+      const { data: savedEntries } = await supabase
+        .from("saved_jobs")
+        .select("job_url, metadata")
+        .eq("user_id", user.id);
+      savedEntries?.forEach(s => {
+        if (s.job_url) userSavedUrlSet.add(s.job_url);
+        if (s.metadata?.applyLink) userSavedUrlSet.add(s.metadata.applyLink);
+      });
+
+      const { data: appEntries } = await supabase
+        .from("job_applications")
+        .select("metadata")
+        .eq("user_id", user.id);
+      appEntries?.forEach(a => {
+        if (a.metadata?.applyLink) userAppliedUrlSet.add(a.metadata.applyLink);
+      });
+    }
+
+    for (const { item, platform } of rawResults) {
+      if (seenUrls.has(item.url)) continue;
+      seenUrls.add(item.url);
+
+      const snippet = cleanSnippetText(item.description || "");
+      const { title, company } = parseTitleAndCompany(item.title, platform, item.url);
+      const salary = extractSalary(snippet);
+      const { score, tags } = calculateMatchScore(title, snippet, candidateSkills, candidateRole);
+
+      // Construct company logo domain
+      const companyDomain = company
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "")
+        .concat(".com");
+      const companyLogo = item.profile?.img || `https://icon.horse/icon/${companyDomain}`;
+
+      const isSaved = userSavedUrlSet.has(item.url);
+      const isApplied = userAppliedUrlSet.has(item.url);
+
+      const jobRecord = {
+        id: uuidv4(),
+        user_id: user?.id || null,
+        resume_id: resumeId || null,
+        search_fingerprint: searchFingerprint,
+        platform,
+        title,
+        company,
+        company_logo: companyLogo,
+        location: filters?.isRemote ? "100% Remote" : (candidateLocation || "Remote / Hybrid"),
+        salary: salary || (score > 90 ? "$130k - $175k" : "$110k - $150k"),
+        job_type: filters?.jobType || "Full-time",
+        experience_level: filters?.experienceLevel || (score > 90 ? "Senior-level" : "Mid-level"),
+        description: snippet || "Click Apply Now to view complete job responsibilities and submit your application on the official platform.",
+        tags,
+        match_score: score,
+        job_url: item.url,
+        source_url: item.url,
+        applied_status: isApplied ? "applied" : "not_applied",
+        saved_status: isSaved,
+        fetched_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      };
+
+      normalizedJobs.push(jobRecord);
+    }
+
+    // Sort jobs by match_score descending
+    normalizedJobs.sort((a, b) => b.match_score - a.match_score);
+
+    // 6. Save to Supabase `jobs` Table (if user logged in)
+    if (user && normalizedJobs.length > 0) {
+      const recordsToInsert = normalizedJobs.map(j => ({
+        ...j,
+        user_id: user.id,
+      }));
+
+      const { error: insertError } = await supabase
+        .from("jobs")
+        .insert(recordsToInsert);
+
+      if (insertError) {
+        console.error("[JobSearch] Error persisting jobs to Supabase:", insertError.message);
+      } else {
+        console.log(`[JobSearch] Successfully cached ${recordsToInsert.length} jobs in Supabase for user ${user.id}`);
+      }
+    }
+
+    // 7. Plan Limits & Response
+    const maxJobs = user ? await getUserPlanLimit(supabase, user.id) : 6;
+    const displayedJobs = maxJobs === Infinity ? normalizedJobs : normalizedJobs.slice(0, maxJobs);
 
     return NextResponse.json({
       success: true,
-      jobs: validatedJobs,
-      query: displayQuery,
-      targetLocation,
+      jobs: displayedJobs.map(formatDbJobToStoreJob),
+      cached: false,
+      fetchedAt: new Date().toISOString(),
+      total: normalizedJobs.length,
+      query: candidateRole,
     });
-
   } catch (error: any) {
-    console.error("[JobSearch] Endpoint error:", error.message);
-    return NextResponse.json({
-      success: false,
-      jobs: [],
-      error: error.message || "An error occurred while fetching real jobs."
-    });
+    console.error("[JobSearch] Route exception:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        jobs: [],
+        error: error.message || "Failed to discover matching jobs. Please try again.",
+      },
+      { status: 500 }
+    );
   }
+}
+
+/**
+ * Format DB job row to Store Job interface
+ */
+function formatDbJobToStoreJob(dbJob: any) {
+  return {
+    id: dbJob.id,
+    title: dbJob.title,
+    company: dbJob.company,
+    companyLogo: dbJob.company_logo,
+    company_logo: dbJob.company_logo,
+    location: dbJob.location || "Remote",
+    isRemote: dbJob.location?.toLowerCase().includes("remote") ?? true,
+    salary: dbJob.salary,
+    applyLink: dbJob.job_url,
+    job_url: dbJob.job_url,
+    source_url: dbJob.source_url,
+    description: dbJob.description,
+    type: dbJob.job_type || "Full-time",
+    job_type: dbJob.job_type || "Full-time",
+    employmentType: dbJob.job_type || "Full-time",
+    experience_level: dbJob.experience_level || "Mid-level",
+    source: dbJob.platform ? `${dbJob.platform.charAt(0).toUpperCase() + dbJob.platform.slice(1)} Verified` : "Direct Verified",
+    platform: dbJob.platform,
+    postedAt: dbJob.fetched_at || dbJob.created_at || new Date().toISOString(),
+    fetched_at: dbJob.fetched_at,
+    skills: Array.isArray(dbJob.tags) ? dbJob.tags : [],
+    tags: Array.isArray(dbJob.tags) ? dbJob.tags : [],
+    match_score: dbJob.match_score || 85,
+    matchScore: dbJob.match_score || 85,
+    applied_status: dbJob.applied_status || "not_applied",
+    saved_status: dbJob.saved_status || false,
+  };
+}
+
+/**
+ * Helper to get user subscription tier limit
+ */
+async function getUserPlanLimit(supabase: any, userId: string): Promise<number> {
+  try {
+    const { data: sub } = await supabase
+      .from("subscriptions")
+      .select("plan_id, status")
+      .eq("user_id", userId)
+      .single();
+
+    if (sub && (sub.status === "active" || sub.status === "trialing")) {
+      if (sub.plan_id === "unlimited" || sub.plan_id === "enterprise" || sub.plan_id === "pdt_0NewgKeXYMkBEofXpxy9Z") {
+        return Infinity;
+      }
+      if (sub.plan_id === "pro" || sub.plan_id === "pdt_0Newfu26VwAPCKJBoT8z5") {
+        return 45;
+      }
+    }
+  } catch (err) {
+    console.warn("[JobSearch] Error checking user plan:", err);
+  }
+  return 25; // Free plan limit: generous 25 jobs
 }

@@ -1,5 +1,37 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies, headers } from "next/headers";
+import { initResilientDns } from "@/utils/resilientDns";
+
+initResilientDns();
+
+async function resilientFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  let attempts = 0;
+  const maxAttempts = 3;
+
+  while (attempts < maxAttempts) {
+    attempts++;
+    try {
+      return await fetch(input, init);
+    } catch (err: any) {
+      const msg = err?.message || "";
+      const code = err?.code || err?.cause?.code || "";
+      const isTransient =
+        msg.includes("fetch failed") ||
+        code === "UND_ERR_CONNECT_TIMEOUT" ||
+        code === "ENOTFOUND" ||
+        code === "ECONNRESET" ||
+        code === "ETIMEDOUT";
+
+      if (isTransient && attempts < maxAttempts) {
+        console.warn(`[Supabase Server Fetch] Attempt ${attempts} warning (${code || msg}). Retrying in ${attempts * 400}ms...`);
+        await new Promise((r) => setTimeout(r, attempts * 400));
+        continue;
+      }
+      throw err;
+    }
+  }
+  return fetch(input, init);
+}
 
 export async function createClient() {
   let cookieStore: Awaited<ReturnType<typeof cookies>> | undefined;
@@ -40,6 +72,7 @@ export async function createClient() {
       },
       global: {
         headers: authHeader ? { Authorization: authHeader } : undefined,
+        fetch: resilientFetch,
       },
     }
   );

@@ -22,6 +22,7 @@ function BuilderOptionsContent() {
     if (tid) {
       setTemplateId(tid);
     }
+    useResumeStore.getState().fetchUserResumes();
   }, [searchParams, setTemplateId]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -84,17 +85,21 @@ function BuilderOptionsContent() {
         : "Imported Resume";
 
       const newId = await createResume(resumeTitle, data);
-      setUploadProgress(100);
+      
+      if (!newId) {
+        const storeError = useResumeStore.getState().error;
+        if (storeError === "PLAN_LIMIT_REACHED_PRO" || storeError === "PLAN_LIMIT_REACHED_UNLIMITED") {
+          throw new Error("You have reached the resume limit for your plan. Please upgrade to import more resumes.");
+        }
+        throw new Error(storeError || "Failed to save your imported resume. Please try again.");
+      }
 
-      toast.success("Resume imported successfully!");
+      setUploadProgress(100);
+      toast.success("Resume imported successfully! Opening resume builder...");
 
       setTimeout(() => {
-        if (newId) {
-          router.push(`/builder/edit?id=${newId}`);
-        } else {
-          router.push("/builder/edit");
-        }
-      }, 500);
+        router.push(`/builder/edit?id=${newId}`);
+      }, 400);
 
     } catch (error: any) {
       console.error("[Resume Upload]", error);
@@ -111,7 +116,7 @@ function BuilderOptionsContent() {
       
       // Explicitly construct an empty resume data object instead of using the cached 'data' from state
       const emptyData = {
-        personalInfo: { fullName: '', email: '', phone: '', location: '', summary: '', photo: '' },
+        personalInfo: { fullName: '', email: '', phone: '', location: '', summary: '', photo: '', website: '' },
         experience: [],
         education: [],
         skills: [],
@@ -124,14 +129,21 @@ function BuilderOptionsContent() {
       
       const newId = await createResume('My Professional Resume', emptyData as any);
       
-      if (newId) {
-        router.push(`/builder/edit?id=${newId}&source=scratch`);
-      } else {
-        router.push('/builder/edit');
+      if (!newId) {
+        const storeError = useResumeStore.getState().error;
+        if (storeError === "PLAN_LIMIT_REACHED_PRO" || storeError === "PLAN_LIMIT_REACHED_UNLIMITED") {
+          toast.error("You have reached the resume limit for your plan. Please upgrade to create more resumes.");
+          setIsUploading(false);
+          return;
+        }
+        throw new Error(storeError || "Failed to create resume.");
       }
-    } catch (error) {
-      console.error(error);
-      router.push('/builder/edit');
+
+      router.push(`/builder/edit?id=${newId}&source=scratch`);
+    } catch (error: any) {
+      console.error("[Create Scratch]", error);
+      toast.error(error.message || "Failed to initialize new resume.");
+      setIsUploading(false);
     }
   };
 

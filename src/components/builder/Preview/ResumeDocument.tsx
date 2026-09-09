@@ -122,8 +122,13 @@ export const ResumeDocument = ({ data, templateId = 'modern' }: { data: ResumeDa
           {data.projects.map((proj) => (
             <View key={proj.id} style={styles.entry}>
               <Text style={styles.entryTitle}>{proj.name}</Text>
-              <Text style={{ fontSize: 9, color: '#64748b', fontStyle: 'italic', marginBottom: 3 }}>{proj.description}</Text>
-              <Text style={{ fontSize: 8, color: '#2563eb' }}>Tools: {proj.technologies.join(', ')}</Text>
+              {proj.description && <Text style={{ fontSize: 9, color: '#64748b', fontStyle: 'italic', marginBottom: 3 }}>{proj.description}</Text>}
+              {proj.technologies && proj.technologies.length > 0 && (
+                <Text style={{ fontSize: 8, color: '#2563eb' }}>Tools: {Array.isArray(proj.technologies) ? proj.technologies.join(', ') : proj.technologies}</Text>
+              )}
+              {proj.link && (
+                <Text style={{ fontSize: 7.5, color: '#64748b', marginTop: 1 }}>{proj.link}</Text>
+              )}
             </View>
           ))}
         </View>
@@ -139,6 +144,22 @@ export const ResumeDocument = ({ data, templateId = 'modern' }: { data: ResumeDa
                 <Text style={{ fontSize: 8.5, color: '#64748b' }}>{edu.year}</Text>
               </View>
               <Text style={styles.entrySubtitle}>{edu.school}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {data.certifications && data.certifications.length > 0 && (
+        <View style={styles.section}>
+          <Text style={isCreative ? (styles as any).mainSectionTitle : styles.sectionTitle}>Certifications</Text>
+          {data.certifications.map((cert) => (
+            <View key={cert.id} style={styles.entry}>
+              <View style={styles.entryHeader}>
+                <Text style={styles.entryTitle}>{cert.name}</Text>
+                {cert.date && <Text style={{ fontSize: 8.5, color: '#64748b' }}>{cert.date}</Text>}
+              </View>
+              <Text style={styles.entrySubtitle}>{cert.issuer}</Text>
+              {cert.link && <Text style={{ fontSize: 7.5, color: '#2563eb', marginTop: 1 }}>{cert.link}</Text>}
             </View>
           ))}
         </View>

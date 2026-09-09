@@ -16,7 +16,8 @@ import {
   Briefcase,
   LogOut,
   Building2,
-  Mail
+  Mail,
+  Sparkles
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -27,6 +28,7 @@ import { useRouter } from 'next/navigation';
 import { useJobStore } from '@/store/useJobStore';
 import { useResumeStore } from '@/store/useResumeStore';
 import { useSubscriptionStore } from '@/store/useSubscription';
+import { useAgentTrackerStore } from '@/store/useAgentTrackerStore';
 import HTMLPreview from '@/components/builder/Preview/HTMLPreview';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 
@@ -40,6 +42,8 @@ export default function DashboardPage() {
   const resetResumes = useResumeStore(s => s.reset);
   const userResumes = useResumeStore(s => s.userResumes);
   const fetchUserResumes = useResumeStore(s => s.fetchUserResumes);
+  const activeJob = useAgentTrackerStore(s => s.activeJob);
+  const restore = useAgentTrackerStore(s => s.restore);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -210,36 +214,104 @@ export default function DashboardPage() {
                   <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center">
                     <Building2 className="w-5 h-5 text-slate-600" />
                   </div>
-                  <h2 className="text-xl font-black text-slate-900">Recent Applications</h2>
+                  <div>
+                    <h2 className="text-xl font-black text-slate-900">Recent Applications</h2>
+                    <p className="text-xs text-slate-400 font-medium">Track your automated and submitted applications</p>
+                  </div>
                 </div>
-                <Link href="/jobs/saved" className="text-sm font-bold text-blue-600 hover:underline">View All</Link>
+                <Link href="/applications" className="text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 group">
+                  View All Hub
+                  <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                </Link>
               </div>
-              <div className="space-y-6">
-                {applications.length > 0 ? applications.map((app, i) => (
-                  <div key={app.id || i} className="flex items-center justify-between p-4 rounded-3xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
-                    <div className="flex items-center gap-4">
-                      <CompanyLogo 
-                        logoUrl={app.metadata?.companyLogo} 
-                        companyName={app.company_name} 
-                        size="sm" 
-                      />
-                      <div>
-                        <h4 className="font-bold text-slate-900">{app.job_title}</h4>
-                        <p className="text-xs text-slate-500 font-medium">{app.company_name} • {formatDate(app.created_at)}</p>
-                      </div>
+
+              {/* Active Agent Banner if running */}
+              {activeJob && (
+                <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg shadow-blue-500/20">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center flex-shrink-0">
+                      <Sparkles className="w-5 h-5 text-white animate-pulse" />
                     </div>
-                    <div className="text-right">
-                      <span className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest ${
-                        app.status === 'interviewing' ? 'bg-green-50 text-green-600' :
-                        app.status === 'offered' ? 'bg-emerald-50 text-emerald-600' :
-                        app.status === 'rejected' ? 'bg-red-50 text-red-600' :
-                        'bg-blue-50 text-blue-600'
-                      }`}>
-                        {app.status}
+                    <div>
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/20 text-[10px] font-black uppercase tracking-wider mb-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                        AI Agent Active
                       </span>
+                      <p className="text-sm font-black text-white">Applying to {activeJob.title} at {activeJob.company}</p>
                     </div>
                   </div>
-                )) : (
+                  <button
+                    onClick={restore}
+                    className="px-4 py-2 bg-white text-blue-600 font-black text-xs rounded-xl hover:bg-blue-50 transition-colors shadow-sm self-start sm:self-auto"
+                  >
+                    Open Live Console
+                  </button>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                {applications.length > 0 ? applications.map((app, i) => {
+                  const statusStr = app.status as string;
+                  const isAgentRunning = ['queued', 'detecting_fields', 'submitting', 'needs_user_input'].includes(statusStr);
+                  return (
+                    <div key={app.id || i} className="flex items-center justify-between p-4 rounded-3xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
+                      <div className="flex items-center gap-4 min-w-0">
+                        <CompanyLogo 
+                          logoUrl={app.metadata?.companyLogo} 
+                          companyName={app.company_name} 
+                          size="sm" 
+                        />
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-slate-900 truncate">{app.job_title}</h4>
+                          <p className="text-xs text-slate-500 font-medium truncate">{app.company_name} • {formatDate(app.created_at)}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {isAgentRunning ? (
+                          <button
+                            onClick={() => {
+                              const jobData = app.metadata || {
+                                id: app.id,
+                                title: app.job_title,
+                                company: app.company_name,
+                                location: app.location || 'Remote',
+                                isRemote: true,
+                                salary: null,
+                                applyLink: app.job_url || '',
+                                description: '',
+                                type: 'Full-time',
+                                source: 'direct',
+                                postedAt: app.created_at,
+                                skills: [],
+                              };
+                              useAgentTrackerStore.getState().startTracking({
+                                applicationId: app.id,
+                                job: jobData,
+                              });
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-full text-xs font-bold transition-all shadow-sm group"
+                          >
+                            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                            Live Progress
+                            <ArrowUpRight className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                          </button>
+                        ) : (
+                          <Link
+                            href="/applications"
+                            className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest ${
+                              app.status === 'interviewing' ? 'bg-green-50 text-green-600' :
+                              app.status === 'offered' ? 'bg-emerald-50 text-emerald-600' :
+                              app.status === 'rejected' ? 'bg-red-50 text-red-600' :
+                              'bg-blue-50 text-blue-600'
+                            }`}
+                          >
+                            {app.status}
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }) : (
                   <div className="text-center py-12">
                     <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
                       <Briefcase className="w-8 h-8 text-slate-300" />

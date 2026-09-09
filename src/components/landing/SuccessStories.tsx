@@ -129,6 +129,7 @@ export default function SuccessStories() {
                     src={testimonials[currentIndex].image}
                     alt={testimonials[currentIndex].name}
                     fill
+                    sizes="(max-width: 768px) 100vw, 340px"
                     className="object-cover"
                   />
                   {/* Portrait Footer */}
@@ -189,7 +190,7 @@ export default function SuccessStories() {
                   currentIndex === i ? 'border-blue-600 scale-110 shadow-lg shadow-blue-600/20' : 'border-white/10 opacity-40 hover:opacity-100'
                 }`}
               >
-                <Image src={t.image} alt={t.name} fill className="object-cover" />
+                <Image src={t.image} alt={t.name} fill sizes="64px" className="object-cover" />
               </button>
             ))}
           </div>

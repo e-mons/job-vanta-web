@@ -71,7 +71,17 @@ export async function POST(req: Request) {
     const productId = foundPayment.product_id || 
       (foundPayment.product_cart && foundPayment.product_cart[0]?.product_id);
     
-    const matchedPlan = PLANS.find(p => p.priceId === productId);
+    let resolvedPlanId = "pro";
+    if (productId === "pdt_0NewgKeXYMkBEofXpxy9Z" || productId === "unlimited" || productId === "enterprise") {
+      resolvedPlanId = "unlimited";
+    } else if (productId === "pdt_0Newfu26VwAPCKJBoT8z5" || productId === "pro") {
+      resolvedPlanId = "pro";
+    } else {
+      const matchedPlan = PLANS.find(p => p.priceId === productId || p.id === productId);
+      resolvedPlanId = (matchedPlan?.id as string) || productId || "pro";
+    }
+
+    const todayDate = new Date().toISOString().split("T")[0];
 
     // Upsert the subscription into Supabase
     const { error } = await adminSupabase
@@ -80,8 +90,12 @@ export async function POST(req: Request) {
         user_id: user.id,
         dodo_customer_id: foundPayment.customer?.customer_id || foundPayment.customer_id || null,
         dodo_subscription_id: foundPayment.subscription_id || null,
-        plan_id: matchedPlan?.id || productId || "pro",
+        dodo_payment_id: foundPayment.payment_id || null,
+        last_payment_details: foundPayment,
+        plan_id: resolvedPlanId,
         status: "active",
+        daily_ai_applies_count: 0,
+        daily_usage_date: todayDate,
         current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
@@ -91,11 +105,11 @@ export async function POST(req: Request) {
       throw error;
     }
 
-    console.log(`[Verify] Subscription synced for user ${user.id}, plan: ${matchedPlan?.id || productId}`);
+    console.log(`[Verify] Subscription synced for user ${user.id}, plan: ${resolvedPlanId}`);
 
     return NextResponse.json({ 
       status: "synced",
-      planId: matchedPlan?.id || productId,
+      planId: resolvedPlanId,
     });
 
   } catch (err: any) {

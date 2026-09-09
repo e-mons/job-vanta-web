@@ -57,21 +57,24 @@ export default function MobilePromo() {
               </div>
               
               <div className="flex flex-wrap items-center gap-4 pt-4">
-                <div className="flex items-center gap-3 px-8 py-4 rounded-2xl glass-dark border border-white/10 text-white shadow-xl opacity-80 cursor-not-allowed">
+                <a 
+                  href="#download"
+                  className="flex items-center gap-3 px-8 py-4 rounded-2xl glass-dark border border-white/20 text-white shadow-xl hover:border-blue-500/50 hover:bg-white/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
                   <div className="flex flex-col">
-                    <span className="text-[10px] text-white/40 uppercase font-black tracking-wider leading-none">In Development</span>
-                    <span className="text-lg font-black leading-tight">Mobile Apps Coming Soon</span>
+                    <span className="text-[10px] text-blue-400 uppercase font-black tracking-wider leading-none">Available Now</span>
+                    <span className="text-lg font-black leading-tight">Launch Mobile Experience</span>
                   </div>
-                </div>
+                </a>
               </div>
 
-              <div className="mt-8 flex items-center gap-6 p-6 rounded-[2rem] glass-dark border border-white/10 w-fit group opacity-50">
+              <div className="mt-8 flex items-center gap-6 p-6 rounded-[2rem] glass-dark border border-white/10 w-fit group">
                  <div className="p-3 bg-white rounded-2xl">
                    <QrCode className="w-12 h-12 text-slate-900" />
                  </div>
                  <div>
-                   <div className="font-black text-white text-base">App in Review</div>
-                   <div className="text-slate-400 text-xs font-medium">Coming soon for iOS & Android</div>
+                   <div className="font-black text-white text-base">Scan to Open on Mobile</div>
+                   <div className="text-slate-400 text-xs font-medium">Instant sync across iOS & Android</div>
                  </div>
               </div>
             </motion.div>

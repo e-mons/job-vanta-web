@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 const resumeSchema = z.object({
   personalInfo: z.object({
     fullName: z.string().min(2, "Full Name is required (at least 2 characters)."),
-    email: z.string().email("A valid email address is required."),
+    email: z.string().min(3, "A valid email address is required."),
     phone: z.string().min(5, "A valid phone number is required."),
     location: z.string().min(2, "Location (City, State/Country) is required."),
     summary: z.string().min(20, "Professional Summary is required (at least 20 characters)."),
@@ -42,7 +42,14 @@ const resumeSchema = z.object({
     id: z.string(),
     name: z.string(),
     description: z.string(),
-    technologies: z.array(z.string()),
+    technologies: z.array(z.string()).optional(),
+    link: z.string().optional(),
+  })).optional(),
+  certifications: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    issuer: z.string(),
+    date: z.string().optional(),
     link: z.string().optional(),
   })).optional(),
 });
@@ -254,7 +261,14 @@ function BuilderEditContent() {
       if (!res.ok) throw new Error(result.error || "Generation failed");
       
       setResumeData(result.data);
-      setShowAIPrompt(false); // Hide the prompt box
+      if (resumeId && result.data?.personalInfo?.fullName) {
+        const supabase = createClient();
+        const newTitle = `${result.data.personalInfo.fullName}'s Resume`;
+        supabase.from('resumes').update({ title: newTitle }).eq('id', resumeId).then(() => {
+          fetchUserResumes();
+        });
+      }
+      setShowAIPrompt(false);
       toast.success("Resume generated successfully!");
     } catch (err: any) {
       console.error(err);
@@ -434,6 +448,21 @@ function BuilderEditContent() {
             hasLoadedData[1](true);
           });
         }
+      }
+    } else {
+      // Fallback if accessed directly without an id query parameter
+      const storeState = useResumeStore.getState();
+      if (storeState.currentResumeId) {
+        router.replace(`/builder/edit?id=${storeState.currentResumeId}`);
+      } else {
+        fetchUserResumes().then(() => {
+          const resumes = useResumeStore.getState().userResumes;
+          if (resumes.length > 0) {
+            router.replace(`/builder/edit?id=${resumes[0].id}`);
+          } else {
+            router.replace('/builder');
+          }
+        });
       }
     }
 
@@ -1051,6 +1080,15 @@ function BuilderEditContent() {
                     placeholder="New York, NY"
                   />
                 </div>
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] ml-1">Website / Portfolio / LinkedIn / GitHub</label>
+                  <input 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/5 outline-none transition-all font-medium"
+                    value={data.personalInfo.website || ""}
+                    onChange={(e) => updatePersonalInfo({ website: e.target.value })}
+                    placeholder="https://linkedin.com/in/johndoe or https://portfolio.com"
+                  />
+                </div>
               </div>
               
               <div className="space-y-2">
@@ -1327,6 +1365,31 @@ function BuilderEditContent() {
                         onChange={(e) => updateProjectItem(proj.id, 'description', e.target.value)}
                       />
                     </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Project / Demo Link</label>
+                        <input 
+                          placeholder="e.g. https://github.com/example/project" 
+                          className="bg-transparent text-sm font-bold text-slate-600 outline-none border-b-2 border-slate-200 focus:border-orange-500 w-full transition-all pb-2"
+                          value={proj.link || ''}
+                          onChange={(e) => updateProjectItem(proj.id, 'link', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Technologies (comma-separated)</label>
+                        <input 
+                          placeholder="e.g. React, TypeScript, Next.js, Tailwind" 
+                          className="bg-transparent text-sm font-bold text-slate-600 outline-none border-b-2 border-slate-200 focus:border-orange-500 w-full transition-all pb-2"
+                          value={Array.isArray(proj.technologies) ? proj.technologies.join(', ') : (proj.technologies || '')}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const arr = val.split(',').map(s => s.trim());
+                            updateProjectItem(proj.id, 'technologies', arr);
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1371,12 +1434,33 @@ function BuilderEditContent() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Issuer</label>
+                        <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Issuer / Authority</label>
                         <input 
                           placeholder="e.g. Amazon Web Services" 
                           className="bg-transparent text-sm font-bold text-slate-500 outline-none w-full border-b-2 border-slate-200 focus:border-emerald-500 transition-all pb-2"
                           value={cert.issuer}
                           onChange={(e) => updateCertificationItem(cert.id, 'issuer', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Issue Date / Year</label>
+                        <input 
+                          placeholder="e.g. 2023 or Nov 2023" 
+                          className="bg-transparent text-sm font-bold text-slate-500 outline-none w-full border-b-2 border-slate-200 focus:border-emerald-500 transition-all pb-2"
+                          value={cert.date || ''}
+                          onChange={(e) => updateCertificationItem(cert.id, 'date', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Credential URL / Verification Link</label>
+                        <input 
+                          placeholder="e.g. https://www.credly.com/badges/..." 
+                          className="bg-transparent text-sm font-bold text-slate-500 outline-none w-full border-b-2 border-slate-200 focus:border-emerald-500 transition-all pb-2"
+                          value={cert.link || ''}
+                          onChange={(e) => updateCertificationItem(cert.id, 'link', e.target.value)}
                         />
                       </div>
                     </div>

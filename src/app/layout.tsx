@@ -1,16 +1,13 @@
 import type { Metadata } from "next";
-import { Inter, Outfit } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
+const inter = {
+  variable: "font-inter",
+};
 
-const outfit = Outfit({
-  variable: "--font-outfit",
-  subsets: ["latin"],
-});
+const outfit = {
+  variable: "font-outfit",
+};
 
 export const metadata: Metadata = {
   title: "JobVanta | AI-Powered Career Success Platform",

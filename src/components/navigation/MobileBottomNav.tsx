@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, 
   Search, 
+  Briefcase,
   FileText, 
   Bell, 
   Settings 
@@ -18,9 +19,9 @@ export default function MobileBottomNav() {
   const links = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Home" },
     { href: "/jobs", icon: Search, label: "Jobs" },
+    { href: "/applications", icon: Briefcase, label: "Apps" },
     { href: "/builder", icon: FileText, label: "Builder" },
     { href: "/dashboard/notifications", icon: Bell, label: "Inbox" },
-    { href: "/dashboard/settings", icon: Settings, label: "Settings" },
   ];
 
   return (

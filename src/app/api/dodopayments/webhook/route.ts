@@ -46,18 +46,32 @@ export async function POST(req: Request) {
         if (!userId) break;
 
         // Note: Dodo uses slightly different objects, assuming standard subscription event shape
-        const planId = event.data.product_id || (event.data.product_cart && event.data.product_cart[0]?.product_id);
+        const rawPlanId = event.data.product_id || (event.data.product_cart && event.data.product_cart[0]?.product_id);
+        let resolvedPlanId = "pro";
+        if (rawPlanId === "pdt_0NewgKeXYMkBEofXpxy9Z" || rawPlanId === "unlimited" || rawPlanId === "enterprise") {
+          resolvedPlanId = "unlimited";
+        } else if (rawPlanId === "pdt_0Newfu26VwAPCKJBoT8z5" || rawPlanId === "pro") {
+          resolvedPlanId = "pro";
+        } else if (rawPlanId) {
+          resolvedPlanId = rawPlanId;
+        }
+
+        const todayDate = new Date().toISOString().split("T")[0];
         
         // Handle subscription upsert
-        if (subscriptionId) {
+        if (subscriptionId || userId) {
           const { error } = await supabase
             .from("subscriptions")
             .upsert({
               user_id: userId,
-              dodo_customer_id: customerId,
-              dodo_subscription_id: subscriptionId,
-              plan_id: planId,
-              status: "active", // Dodo doesn't have multiple complicated statuses initially
+              dodo_customer_id: customerId || null,
+              dodo_subscription_id: subscriptionId || null,
+              dodo_payment_id: event.data.payment_id || null,
+              last_payment_details: event.data,
+              plan_id: resolvedPlanId,
+              status: "active",
+              daily_ai_applies_count: 0,
+              daily_usage_date: todayDate,
               current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // fallback
               updated_at: new Date().toISOString(),
             }, { onConflict: 'user_id' });

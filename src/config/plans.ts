@@ -24,15 +24,15 @@ export const PLANS: Plan[] = [
     name: 'Free',
     price: '0',
     priceId: null,
-    description: 'Perfect for exploring the platform',
+    description: 'Essential tools to kickstart your career search',
     features: [
-      '1 Resume CV',
-      '6 Job Search Results',
-      'No Job Details Access',
-      'No Job Applications',
-      'Basic Support'
+      '1 Resume / CV max',
+      '2 AI Job Applies / day',
+      'No Prepare Me (AI Q&A) access',
+      '25+ Verified Job Search Results',
+      'Basic Email Support'
     ],
-    cta: 'Start for Free',
+    cta: 'Get Started Free',
     href: '/signup',
     highlighted: false,
     iconName: 'Shield'
@@ -40,16 +40,16 @@ export const PLANS: Plan[] = [
   {
     id: 'pro',
     name: 'Pro',
-    price: '9.99',
+    price: '29',
     priceId: 'pdt_0Newfu26VwAPCKJBoT8z5',
-    description: 'Most popular for active job seekers',
+    description: 'Most popular for active job seekers landing roles fast',
     features: [
-      '5 Resume CVs',
-      '18 Job Search Results',
-      'View Job Details',
-      'Full Job Applications',
-      'Unlimited AI Resume Optimization',
-      'Priority Email Support'
+      '5 Resumes / CVs max',
+      '25 AI Job Applies / day',
+      'Prepare Me: Job-Specific AI Q&A Unlocked',
+      'Risk Radar & Factual Truth Lock',
+      '45+ Verified Job Search Results',
+      'Priority Email & Chat Support'
     ],
     cta: 'Get Started Pro',
     href: '/signup?plan=pro',
@@ -57,21 +57,21 @@ export const PLANS: Plan[] = [
     iconName: 'Zap'
   },
   {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: '14.99',
+    id: 'unlimited',
+    name: 'Unlimited',
+    price: '99',
     priceId: 'pdt_0NewgKeXYMkBEofXpxy9Z',
-    description: 'Executive-level career management',
+    description: 'Complete career acceleration with zero restrictions',
     features: [
-      'Unlimited Resumes',
-      'Unlimited Job Searches',
-      'View Job Details',
-      'Full Job Applications',
-      'Dedicated Career Coach (AI)',
-      'Portfolio Website Builder'
+      'Unlimited Resumes / CVs',
+      'Unlimited AI Job Applies / day',
+      'Prepare Me: Job-Specific AI Q&A Unlocked',
+      'Voice Practice & STAR Delivery Scoring',
+      'Unlimited Job Searches & Results',
+      '24/7 Priority Support & Career Mentorship'
     ],
-    cta: 'Go Enterprise',
-    href: '/signup?plan=enterprise',
+    cta: 'Go Unlimited',
+    href: '/signup?plan=unlimited',
     highlighted: false,
     iconName: 'Crown'
   }

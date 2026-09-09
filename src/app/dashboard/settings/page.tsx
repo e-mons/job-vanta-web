@@ -25,6 +25,7 @@ import { PLANS } from "@/config/plans";
 import { useSubscriptionStore } from "@/store/useSubscription";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import ApplicationInformationSection from "@/components/jobs/ApplicationInformationSection";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'profile' | 'subscription' | 'security' | 'notifications'>('profile');
@@ -127,13 +128,12 @@ export default function SettingsPage() {
 
   const handleChangePassword = async () => {
     const supabase = createClient();
-    const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email);
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success("Password reset email sent!");
+      toast.success("A 6-digit password reset code has been sent to your email!");
+      router.push(`/forgot-password?email=${encodeURIComponent(user.email)}`);
     }
   };
 
@@ -356,6 +356,9 @@ export default function SettingsPage() {
                       </button>
                     </div>
                   </div>
+
+                  {/* Auto Apply Reusable Application Details */}
+                  <ApplicationInformationSection />
                 </motion.div>
               )}
 
@@ -412,10 +415,10 @@ export default function SettingsPage() {
                           </button>
                         )}
                         <button 
-                          onClick={() => router.push('/pricing')}
-                          className="px-8 py-4 bg-white/10 hover:bg-white/20 text-white rounded-[20px] font-black text-sm transition-all border border-white/10"
+                          onClick={() => router.push('/dashboard/billing')}
+                          className="px-8 py-4 bg-white/10 hover:bg-white/20 text-white rounded-[20px] font-black text-sm transition-all border border-white/10 flex items-center justify-center gap-2"
                         >
-                          View Pricing Plans
+                          <CreditCard className="w-4 h-4" /> View Usage & Plans
                         </button>
                       </div>
                     </div>

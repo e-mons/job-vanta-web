@@ -187,6 +187,7 @@ export default function Templates() {
                   src={template.image}
                   alt={template.name}
                   fill
+                  sizes="(max-width: 768px) 320px, 400px"
                   className="object-cover transition-transform duration-700 group-hover:scale-110"
                 />
 

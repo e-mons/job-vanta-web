@@ -133,6 +133,17 @@ export default function DashboardHeader() {
                 {/* Menu Items */}
                 <div className="p-3">
                   <Link
+                    href="/applications"
+                    onClick={() => setIsOpen(false)}
+                    className="flex items-center gap-4 px-4 py-3 rounded-2xl text-[13px] font-black text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-all group"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-white group-hover:text-blue-600 transition-all">
+                      <Briefcase className="w-4 h-4" />
+                    </div>
+                    <span className="flex-1">My Applications</span>
+                  </Link>
+
+                  <Link
                     href="/dashboard/notifications"
                     onClick={() => setIsOpen(false)}
                     className="flex items-center gap-4 px-4 py-3 rounded-2xl text-[13px] font-black text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-all group"
