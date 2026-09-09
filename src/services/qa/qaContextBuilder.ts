@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import { createClient } from "@/utils/supabase/server";
-import type { ApplicationQAContext } from "../../../../shared/types/qa";
+import type { ApplicationQAContext } from "@shared/types/qa";
 
 export class QAAuthorizationError extends Error {
   constructor(message = "Unauthorized to access this application context") {

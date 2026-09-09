@@ -4,7 +4,7 @@ import type {
   ApplicationMemory, 
   UserCareerConfirmation, 
   ApplicationQAContext 
-} from "../../../../shared/types/qa";
+} from "@shared/types/qa";
 
 /**
  * Deterministically calculates total years of experience from experience date ranges.

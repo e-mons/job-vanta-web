@@ -1,4 +1,4 @@
-import type { ApplicationQAContext, QAStageType } from "../../../../shared/types/qa";
+import type { ApplicationQAContext, QAStageType } from "@shared/types/qa";
 
 /**
  * Infers candidate seniority level based on work experience history and roles.

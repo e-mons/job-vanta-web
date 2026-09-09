@@ -15,7 +15,7 @@ import {
   transitionStage, 
   toggleQuestionReview 
 } from "../qaJourneyService";
-import type { QAQuestion, QAAnswer, QAWorkspace, QAStage } from "../../../../../shared/types/qa";
+import type { QAQuestion, QAAnswer, QAWorkspace, QAStage } from "@shared/types/qa";
 
 /**
  * Mock Supabase Database Helper for Journey and Radar tests

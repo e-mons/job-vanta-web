@@ -4,7 +4,7 @@ import type {
   TruthVerificationDetails, 
   QATruthStatus,
   QAQuestionCategory
-} from "../../../../shared/types/qa";
+} from "@shared/types/qa";
 
 /**
  * Extracts verifiable factual claims (metrics, numbers, tools, durations, salary, leadership)

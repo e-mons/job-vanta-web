@@ -6,7 +6,7 @@ import type {
   QAClarificationScope, 
   QAClarificationType,
   QAAnswer 
-} from "../../../../shared/types/qa";
+} from "@shared/types/qa";
 
 export interface SubmitClarificationResult {
   clarification: QAClarification;

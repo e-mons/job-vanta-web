@@ -14,7 +14,7 @@ import type {
   QAAnswer, 
   QAClarification, 
   QAStageType 
-} from "../../../../shared/types/qa";
+} from "@shared/types/qa";
 
 export class QAGenerationInProgressError extends Error {
   constructor(message = "A preparation generation is already in progress for this application") {

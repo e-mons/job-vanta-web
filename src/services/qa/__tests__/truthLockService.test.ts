@@ -12,7 +12,7 @@ import {
   validateClarificationResponse, 
   submitClarification 
 } from "../qaClarificationService";
-import type { ApplicationMemory } from "../../../../../shared/types/qa";
+import type { ApplicationMemory } from "@shared/types/qa";
 
 /**
  * Mock database creator for Truth Lock tests

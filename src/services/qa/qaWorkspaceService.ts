@@ -1,6 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { buildApplicationQAContext, QAAuthorizationError, QANotFoundError } from "./qaContextBuilder";
-import type { QAWorkspace, QAStage } from "../../../../shared/types/qa";
+import type { QAWorkspace, QAStage } from "@shared/types/qa";
 
 export interface GetOrCreateWorkspaceResult {
   workspace: QAWorkspace;
