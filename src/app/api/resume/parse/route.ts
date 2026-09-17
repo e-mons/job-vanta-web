@@ -4,6 +4,9 @@ import { v4 as uuidv4 } from "uuid";
 import { callGeminiWithFallback, callGeminiWithInlineDataFallback } from "@/utils/gemini";
 import { createClient } from "@/utils/supabase/server";
 
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+
 const nullableString = z.preprocess(
   (val) => (val === null || val === undefined ? "" : String(val).trim()),
   z.string().default("")
@@ -217,6 +220,8 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
+    const paramFileName = (formData.get("fileName") as string | null) || "";
+    const paramFileType = (formData.get("fileType") as string | null) || "";
 
     if (!file) {
       return NextResponse.json({ error: "No file provided." }, { status: 400 });
@@ -224,15 +229,28 @@ export async function POST(req: NextRequest) {
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    const fileName = (file.name ?? "").toLowerCase();
 
-    // Normalise MIME
-    let mimeType = file.type || "application/pdf";
-    if (fileName.endsWith(".pdf")) mimeType = "application/pdf";
-    if (fileName.endsWith(".docx")) mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-    if (fileName.endsWith(".txt")) mimeType = "text/plain";
+    if (buffer.length === 0) {
+      return NextResponse.json({ error: "The selected file is empty." }, { status: 400 });
+    }
 
-    console.log(`[Resume Parse] Processing file: ${fileName}, size: ${bytes.byteLength}, mime: ${mimeType}`);
+    const originalName = paramFileName || file.name || "resume.pdf";
+    const fileName = originalName.toLowerCase();
+
+    // Magic bytes detection
+    const isPdf = buffer.length >= 4 && buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46; // %PDF
+    const isZipOrDocx = (buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4B && buffer[2] === 0x03 && buffer[3] === 0x04) || fileName.endsWith(".docx") || fileName.endsWith(".doc"); // PK.. or .docx/.doc
+    const isTxt = fileName.endsWith(".txt") || (!isPdf && !isZipOrDocx && (paramFileType === "text/plain" || file.type === "text/plain"));
+
+    let mimeType = isPdf
+      ? "application/pdf"
+      : isZipOrDocx
+      ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      : isTxt
+      ? "text/plain"
+      : file.type || "application/pdf";
+
+    console.log(`[Resume Parse] Processing file: ${fileName}, size: ${bytes.byteLength}, detected: ${isPdf ? "PDF" : isZipOrDocx ? "DOCX" : isTxt ? "TXT" : "Other"}, mime: ${mimeType}`);
 
     // Optional upload to Supabase storage bucket `resumes` if user is logged in
     let storagePath: string | null = null;
@@ -240,7 +258,7 @@ export async function POST(req: NextRequest) {
       const supabase = await createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const sanitizedName = originalName.replace(/[^a-zA-Z0-9._-]/g, "_");
         const path = `${user.id}/${Date.now()}_${sanitizedName}`;
         const { error: uploadErr } = await supabase.storage
           .from("resumes")
@@ -261,21 +279,72 @@ export async function POST(req: NextRequest) {
 
     let rawText: string;
 
-    if (fileName.endsWith(".txt")) {
+    if (isZipOrDocx) {
+      try {
+        const mammothModule = await import("mammoth");
+        const mammoth = (mammothModule as any).default || mammothModule;
+        const result = await mammoth.extractRawText({ buffer });
+        const docxText = (result?.value || "").trim();
+
+        if (!docxText) {
+          throw new Error("Could not extract readable text from the Word document. Please ensure it is not password protected.");
+        }
+
+        console.log(`[Resume Parse] Successfully extracted ${docxText.length} characters from DOCX.`);
+        rawText = await callGeminiWithFallback(
+          `${PARSE_PROMPT}\n\nResume text to parse:\n${docxText}`,
+          { timeoutMs: 50000 }
+        );
+      } catch (docxErr: any) {
+        console.error("[Resume Parse] DOCX extraction error:", docxErr.message);
+        throw new Error(docxErr.message || "Failed to extract text from Word document. Please try converting to PDF or plain text.");
+      }
+    } else if (isTxt) {
       const textContent = new TextDecoder("utf-8").decode(bytes);
       rawText = await callGeminiWithFallback(
         `${PARSE_PROMPT}\n\nResume text to parse:\n${textContent}`,
         { timeoutMs: 45000 }
       );
     } else {
-      // Convert to base64 for inline multimodal data
-      const base64Data = buffer.toString("base64");
-      rawText = await callGeminiWithInlineDataFallback(
-        base64Data,
-        mimeType,
-        PARSE_PROMPT,
-        { timeoutMs: 50000 }
-      );
+      // PDF or fallback binary document
+      try {
+        const base64Data = buffer.toString("base64");
+        rawText = await callGeminiWithInlineDataFallback(
+          base64Data,
+          "application/pdf",
+          PARSE_PROMPT,
+          { timeoutMs: 50000 }
+        );
+      } catch (inlineErr: any) {
+        console.warn("[Resume Parse] Gemini multimodal inline failed, attempting text fallback with pdf-parse:", inlineErr?.message);
+        try {
+          const pdfParseModule: any = await import("pdf-parse");
+          let pdfText = "";
+          if (pdfParseModule.PDFParse) {
+            const parser = new pdfParseModule.PDFParse({ data: buffer });
+            const result = await parser.getText();
+            pdfText = (result?.text || "").trim();
+          } else if (typeof pdfParseModule.default === "function") {
+            const result = await pdfParseModule.default(buffer);
+            pdfText = (result?.text || "").trim();
+          } else if (typeof pdfParseModule === "function") {
+            const result = await pdfParseModule(buffer);
+            pdfText = (result?.text || "").trim();
+          }
+
+          if (!pdfText || pdfText.length < 20) {
+            throw inlineErr;
+          }
+
+          console.log(`[Resume Parse] Fallback pdf-parse extracted ${pdfText.length} characters.`);
+          rawText = await callGeminiWithFallback(
+            `${PARSE_PROMPT}\n\nResume text to parse:\n${pdfText}`,
+            { timeoutMs: 50000 }
+          );
+        } catch {
+          throw inlineErr;
+        }
+      }
     }
 
     const validatedData = parseAndValidate(rawText);
