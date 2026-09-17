@@ -218,29 +218,49 @@ function parseAndValidate(rawText: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData();
-    const file = formData.get("file") as File | null;
-    const paramFileName = (formData.get("fileName") as string | null) || "";
-    const paramFileType = (formData.get("fileType") as string | null) || "";
+    const contentType = req.headers.get("content-type") || "";
 
-    if (!file) {
-      return NextResponse.json({ error: "No file provided." }, { status: 400 });
+    let buffer: Buffer;
+    let originalName: string = "resume.pdf";
+    let paramFileType: string = "";
+
+    if (contentType.includes("application/json")) {
+      const body = await req.json();
+      const { fileBase64, fileName, fileType } = body;
+
+      if (!fileBase64 || typeof fileBase64 !== "string") {
+        return NextResponse.json({ error: "No file content provided." }, { status: 400 });
+      }
+
+      const cleanedBase64 = fileBase64.includes(",") ? fileBase64.split(",")[1] : fileBase64;
+      buffer = Buffer.from(cleanedBase64, "base64");
+      originalName = fileName || "resume.pdf";
+      paramFileType = fileType || "";
+    } else {
+      const formData = await req.formData();
+      const file = formData.get("file") as File | null;
+      const paramFileName = (formData.get("fileName") as string | null) || "";
+      paramFileType = (formData.get("fileType") as string | null) || "";
+
+      if (!file) {
+        return NextResponse.json({ error: "No file provided." }, { status: 400 });
+      }
+
+      const bytes = await file.arrayBuffer();
+      buffer = Buffer.from(bytes);
+      originalName = paramFileName || file.name || "resume.pdf";
     }
-
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
 
     if (buffer.length === 0) {
       return NextResponse.json({ error: "The selected file is empty." }, { status: 400 });
     }
 
-    const originalName = paramFileName || file.name || "resume.pdf";
     const fileName = originalName.toLowerCase();
 
     // Magic bytes detection
     const isPdf = buffer.length >= 4 && buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46; // %PDF
     const isZipOrDocx = (buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4B && buffer[2] === 0x03 && buffer[3] === 0x04) || fileName.endsWith(".docx") || fileName.endsWith(".doc"); // PK.. or .docx/.doc
-    const isTxt = fileName.endsWith(".txt") || (!isPdf && !isZipOrDocx && (paramFileType === "text/plain" || file.type === "text/plain"));
+    const isTxt = fileName.endsWith(".txt") || (!isPdf && !isZipOrDocx && paramFileType === "text/plain");
 
     let mimeType = isPdf
       ? "application/pdf"
@@ -248,9 +268,9 @@ export async function POST(req: NextRequest) {
       ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
       : isTxt
       ? "text/plain"
-      : file.type || "application/pdf";
+      : paramFileType || "application/pdf";
 
-    console.log(`[Resume Parse] Processing file: ${fileName}, size: ${bytes.byteLength}, detected: ${isPdf ? "PDF" : isZipOrDocx ? "DOCX" : isTxt ? "TXT" : "Other"}, mime: ${mimeType}`);
+    console.log(`[Resume Parse] Processing file: ${fileName}, size: ${buffer.length}, detected: ${isPdf ? "PDF" : isZipOrDocx ? "DOCX" : isTxt ? "TXT" : "Other"}, mime: ${mimeType}`);
 
     // Optional upload to Supabase storage bucket `resumes` if user is logged in
     let storagePath: string | null = null;
@@ -300,7 +320,7 @@ export async function POST(req: NextRequest) {
         throw new Error(docxErr.message || "Failed to extract text from Word document. Please try converting to PDF or plain text.");
       }
     } else if (isTxt) {
-      const textContent = new TextDecoder("utf-8").decode(bytes);
+      const textContent = buffer.toString("utf-8");
       rawText = await callGeminiWithFallback(
         `${PARSE_PROMPT}\n\nResume text to parse:\n${textContent}`,
         { timeoutMs: 45000 }
