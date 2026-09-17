@@ -45,11 +45,16 @@ export async function POST(req: NextRequest) {
       const jsonBody = await req.json().catch(() => ({}));
       questionId = jsonBody.questionId || "";
       durationSeconds = jsonBody.durationSeconds || 45;
-      mode = "text";
+      mode = jsonBody.mode || "text";
       typedText = jsonBody.typedText || "";
 
-      if (!typedText.trim()) {
-        return NextResponse.json({ error: "Missing typedText response" }, { status: 400 });
+      if (jsonBody.audioBase64) {
+        mode = "voice";
+        const cleaned = jsonBody.audioBase64.includes(",") ? jsonBody.audioBase64.split(",")[1] : jsonBody.audioBase64;
+        audioBuffer = Buffer.from(cleaned, "base64");
+        mimeType = jsonBody.mimeType || "audio/m4a";
+      } else if (!typedText.trim()) {
+        return NextResponse.json({ error: "Missing practice response" }, { status: 400 });
       }
     }
 
