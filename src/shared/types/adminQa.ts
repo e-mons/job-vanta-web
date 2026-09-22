@@ -7,6 +7,8 @@ export type AdminRole =
   | 'super_admin' 
   | 'platform_admin' 
   | 'support_manager' 
+  | 'support_lead'
+  | 'support_agent'
   | 'ai_ops' 
   | 'readonly_analyst';
 
@@ -20,7 +22,10 @@ export type AdminPermission =
   | 'qa.view_costs'
   | 'qa.manage_incidents'
   | 'qa.export_operational_data'
-  | 'qa.exceptional_content_access';
+  | 'qa.exceptional_content_access'
+  | 'support.manage_tickets'
+  | 'support.manage_staff'
+  | 'support.view_analytics';
 
 export interface AdminUser {
   id: string;

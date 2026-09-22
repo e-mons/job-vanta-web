@@ -15,7 +15,8 @@ import {
   Bell,
   Settings,
   Bookmark,
-  CreditCard
+  CreditCard,
+  Headphones
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useJobStore } from "@/store/useJobStore";
@@ -67,12 +68,14 @@ export default function DashboardSidebar() {
     },
     { icon: <CreditCard className="w-5 h-5" />, label: "Billing & Plans", href: "/dashboard/billing" },
     { icon: <Bell className="w-5 h-5" />, label: "Notifications", href: "/dashboard/notifications" },
+    { icon: <Headphones className="w-5 h-5" />, label: "Help & Support", href: "/dashboard/support" },
     { icon: <Settings className="w-5 h-5" />, label: "Settings", href: "/dashboard/settings" }
   ];
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard';
     if (href === '/dashboard/billing') return pathname.startsWith('/dashboard/billing');
+    if (href === '/dashboard/support') return pathname.startsWith('/dashboard/support');
     if (href === '/jobs/saved') return pathname === '/jobs/saved';
     if (href === '/applications') return pathname.startsWith('/applications') || pathname.startsWith('/jobs/history');
     if (href === '/jobs') {

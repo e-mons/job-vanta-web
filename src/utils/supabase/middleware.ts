@@ -61,6 +61,15 @@ export async function updateSession(request: NextRequest) {
     );
     const isAuthRoute = authRoutes.some((route) => request.nextUrl.pathname === route);
 
+    // Strict Admin Protection: unauthenticated access to /admin/* bounces directly to /admin/login
+    if (request.nextUrl.pathname.startsWith("/admin") && request.nextUrl.pathname !== "/admin/login") {
+      if (!user) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/admin/login";
+        return NextResponse.redirect(url);
+      }
+    }
+
     if (!user && isProtectedRoute) {
       const url = request.nextUrl.clone();
       const next = url.pathname + url.search;

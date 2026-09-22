@@ -63,7 +63,20 @@ export async function GET() {
       ? subData.daily_ai_applies_count
       : 0;
 
-    // 5. Compute limits and remaining quotas according to strict rules
+    // Fetch system quotas configured by super admin
+    const { data: quotas } = await supabase
+      .from("system_quotas")
+      .select("free_daily_ai_applies, pro_daily_ai_applies, unlimited_daily_ai_applies, free_max_resumes, pro_max_resumes, ai_kill_switch")
+      .eq("id", "global")
+      .maybeSingle();
+
+    const freeDailyApplies = quotas?.free_daily_ai_applies ?? 2;
+    const proDailyApplies = quotas?.pro_daily_ai_applies ?? 25;
+    const freeMaxResumes = quotas?.free_max_resumes ?? 1;
+    const proMaxResumes = quotas?.pro_max_resumes ?? 5;
+    const aiKillSwitch = Boolean(quotas?.ai_kill_switch);
+
+    // 5. Compute limits and remaining quotas according to dynamic quotas
     if (planTier === "unlimited") {
       return NextResponse.json({
         planTier: "unlimited",
@@ -86,12 +99,19 @@ export async function GET() {
           aiAppliesRemainingToday: "unlimited",
           isUnlimited: true,
         },
+        quotas: {
+          aiKillSwitch,
+          freeDailyApplies,
+          proDailyApplies,
+          freeMaxResumes,
+          proMaxResumes,
+        },
       });
     }
 
     if (planTier === "pro") {
-      const resumesLimit = 5;
-      const dailyAppliesLimit = 25;
+      const resumesLimit = proMaxResumes;
+      const dailyAppliesLimit = proDailyApplies;
       return NextResponse.json({
         planTier: "pro",
         planName: "Pro",
@@ -113,12 +133,19 @@ export async function GET() {
           aiAppliesRemainingToday: Math.max(0, dailyAppliesLimit - aiAppliesUsedToday),
           isUnlimited: false,
         },
+        quotas: {
+          aiKillSwitch,
+          freeDailyApplies,
+          proDailyApplies,
+          freeMaxResumes,
+          proMaxResumes,
+        },
       });
     }
 
-    // Free tier defaults
-    const resumesLimit = 1;
-    const dailyAppliesLimit = 2;
+    // Free tier defaults derived from dynamic system_quotas
+    const resumesLimit = freeMaxResumes;
+    const dailyAppliesLimit = freeDailyApplies;
     return NextResponse.json({
       planTier: "free",
       planName: "Free",
@@ -139,6 +166,13 @@ export async function GET() {
         aiAppliesUsedToday,
         aiAppliesRemainingToday: Math.max(0, dailyAppliesLimit - aiAppliesUsedToday),
         isUnlimited: false,
+      },
+      quotas: {
+        aiKillSwitch,
+        freeDailyApplies,
+        proDailyApplies,
+        freeMaxResumes,
+        proMaxResumes,
       },
     });
   } catch (err: any) {

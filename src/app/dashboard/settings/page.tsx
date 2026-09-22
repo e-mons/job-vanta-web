@@ -51,13 +51,39 @@ export default function SettingsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUser(user);
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        const meta = user.user_metadata || {};
+        const resolvedName =
+          profile?.full_name ||
+          meta.full_name ||
+          meta.name ||
+          [meta.given_name, meta.family_name].filter(Boolean).join(" ") ||
+          "";
+
+        const resolvedAvatar =
+          profile?.avatar_url ||
+          meta.avatar_url ||
+          meta.picture ||
+          "";
+
+        const resolvedPhone =
+          profile?.phone_number ||
+          meta.phone ||
+          meta.phone_number ||
+          "";
+
         setProfileForm({
-          fullName: user.user_metadata?.full_name || "",
-          email: user.email || "",
-          phone: user.user_metadata?.phone || "",
-          location: user.user_metadata?.location || "",
-          bio: user.user_metadata?.bio || "",
-          avatarUrl: user.user_metadata?.avatar_url || ""
+          fullName: resolvedName,
+          email: user.email || profile?.email || "",
+          phone: resolvedPhone,
+          location: meta.location || "",
+          bio: meta.bio || "",
+          avatarUrl: resolvedAvatar
         });
       }
       setIsLoading(false);
@@ -91,10 +117,17 @@ export default function SettingsPage() {
       .from('avatars')
       .getPublicUrl(fileName);
 
-    // 3. Update User Metadata
+    // 3. Update User Metadata & Profiles Table
     const { error: updateError } = await supabase.auth.updateUser({
       data: { avatar_url: publicUrl }
     });
+
+    if (user?.id) {
+      await supabase.from('profiles').update({
+        avatar_url: publicUrl,
+        updated_at: new Date().toISOString(),
+      }).eq('id', user.id);
+    }
 
     if (updateError) {
       toast.error(updateError.message);
@@ -117,6 +150,15 @@ export default function SettingsPage() {
         avatar_url: profileForm.avatarUrl
       }
     });
+
+    if (user?.id) {
+      await supabase.from('profiles').update({
+        full_name: profileForm.fullName.trim(),
+        phone_number: profileForm.phone.trim() || null,
+        avatar_url: profileForm.avatarUrl || null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', user.id);
+    }
 
     if (error) {
       toast.error(error.message);

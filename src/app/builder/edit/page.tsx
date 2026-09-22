@@ -433,16 +433,60 @@ function BuilderEditContent() {
 
       // Only load data from the store/DB on first mount, not on every userResumes change
       if (!hasLoadedData[0]) {
+        const fillMissingPersonalInfo = async (rawContent: any) => {
+          if (!rawContent?.personalInfo?.fullName || !rawContent?.personalInfo?.email) {
+            try {
+              const supabase = createClient();
+              const { data: { user } } = await supabase.auth.getUser();
+              if (user) {
+                const meta = user.user_metadata || {};
+                const { data: profile } = await supabase
+                  .from('profiles')
+                  .select('*')
+                  .eq('id', user.id)
+                  .maybeSingle();
+
+                const defaultName =
+                  profile?.full_name ||
+                  meta.full_name ||
+                  meta.name ||
+                  [meta.given_name, meta.family_name].filter(Boolean).join(" ") ||
+                  "";
+                const defaultEmail = user.email || profile?.email || "";
+                const defaultPhone = profile?.phone_number || meta.phone || "";
+                const defaultPhoto = profile?.avatar_url || meta.avatar_url || meta.picture || "";
+
+                return {
+                  ...rawContent,
+                  personalInfo: {
+                    ...rawContent.personalInfo,
+                    fullName: rawContent.personalInfo?.fullName || defaultName,
+                    email: rawContent.personalInfo?.email || defaultEmail,
+                    phone: rawContent.personalInfo?.phone || defaultPhone,
+                    photo: rawContent.personalInfo?.photo || defaultPhoto,
+                  },
+                };
+              }
+            } catch (e) {
+              // Ignore fallback errors
+            }
+          }
+          return rawContent;
+        };
+
         const resume = userResumes.find(r => r.id === resumeId);
         if (resume) {
-          setResumeData(resume.content);
-          if (resume.template_id) useResumeStore.getState().setTemplateId(resume.template_id);
-          hasLoadedData[1](true);
+          fillMissingPersonalInfo(resume.content).then(content => {
+            setResumeData(content);
+            if (resume.template_id) useResumeStore.getState().setTemplateId(resume.template_id);
+            hasLoadedData[1](true);
+          });
         } else {
-          fetchUserResumes().then(() => {
+          fetchUserResumes().then(async () => {
             const r = useResumeStore.getState().userResumes.find(res => res.id === resumeId);
             if (r) {
-              setResumeData(r.content);
+              const content = await fillMissingPersonalInfo(r.content);
+              setResumeData(content);
               if (r.template_id) useResumeStore.getState().setTemplateId(r.template_id);
             }
             hasLoadedData[1](true);

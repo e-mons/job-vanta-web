@@ -9,6 +9,7 @@ import { ChevronLeft, Sparkles, Loader2 } from 'lucide-react';
 import MobileBottomNav from '@/components/navigation/MobileBottomNav';
 import { useResumeStore } from '@/store/useResumeStore';
 import { toast } from 'sonner';
+import { createClient } from '@/utils/supabase/client';
 
 function BuilderOptionsContent() {
   const router = useRouter();
@@ -114,9 +115,34 @@ function BuilderOptionsContent() {
     try {
       const { createResume } = useResumeStore.getState();
       
-      // Explicitly construct an empty resume data object instead of using the cached 'data' from state
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      const meta = user?.user_metadata || {};
+      const { data: profile } = user
+        ? await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+        : { data: null };
+
+      const defaultName =
+        profile?.full_name ||
+        meta.full_name ||
+        meta.name ||
+        [meta.given_name, meta.family_name].filter(Boolean).join(" ") ||
+        "";
+      const defaultEmail = user?.email || profile?.email || "";
+      const defaultPhone = profile?.phone_number || meta.phone || "";
+      const defaultPhoto = profile?.avatar_url || meta.avatar_url || meta.picture || "";
+
+      // Explicitly construct an empty resume data object with pre-filled candidate profile
       const emptyData = {
-        personalInfo: { fullName: '', email: '', phone: '', location: '', summary: '', photo: '', website: '' },
+        personalInfo: {
+          fullName: defaultName,
+          email: defaultEmail,
+          phone: defaultPhone,
+          location: '',
+          summary: '',
+          photo: defaultPhoto,
+          website: '',
+        },
         experience: [],
         education: [],
         skills: [],
@@ -127,7 +153,8 @@ function BuilderOptionsContent() {
         references: [],
       };
       
-      const newId = await createResume('My Professional Resume', emptyData as any);
+      const resumeTitle = defaultName ? `${defaultName}'s Resume` : 'My Professional Resume';
+      const newId = await createResume(resumeTitle, emptyData as any);
       
       if (!newId) {
         const storeError = useResumeStore.getState().error;

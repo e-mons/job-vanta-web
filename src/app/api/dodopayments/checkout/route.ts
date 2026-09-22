@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    const { productId, redirectUrl } = await req.json();
+    const { productId, redirectUrl, discountCode } = await req.json();
 
     if (!productId) {
       return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
       : `${siteUrl}/dashboard`;
 
     // Create Dodo Payments Checkout Session
-    const session = await dodo.checkoutSessions.create({
+    const sessionPayload: any = {
       product_cart: [
         {
           product_id: productId,
@@ -40,8 +40,15 @@ export async function POST(req: Request) {
       return_url,
       metadata: {
         userId: user.id,
+        ...(discountCode ? { promoCode: discountCode } : {}),
       },
-    });
+    };
+
+    if (discountCode && typeof discountCode === "string" && discountCode.trim()) {
+      sessionPayload.discount_code = discountCode.trim();
+    }
+
+    const session = await dodo.checkoutSessions.create(sessionPayload);
 
     return NextResponse.json({ url: session.checkout_url });
   } catch (err: any) {

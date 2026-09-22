@@ -111,8 +111,8 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   },
 
   isPremium: () => {
-    const { status } = get();
-    return status === 'active' || status === 'trialing';
+    const tier = get().getPlanTier();
+    return tier === 'pro' || tier === 'unlimited';
   },
 
   getPlanTier: () => {
