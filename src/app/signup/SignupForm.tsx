@@ -41,6 +41,7 @@ export function SignupForm({ message: initialMessage }: { message?: string }) {
         provider: "google",
         options: {
           redirectTo: `${redirectOrigin}/auth/callback?next=${encodeURIComponent(next || "/dashboard")}`,
+          scopes: "openid email profile",
           queryParams: {
             access_type: "offline",
             prompt: "select_account",
