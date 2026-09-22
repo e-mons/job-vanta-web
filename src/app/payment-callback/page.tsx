@@ -7,22 +7,81 @@ function PaymentCallbackContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string>("Verifying your payment and updating your account...");
 
   useEffect(() => {
+    let isMounted = true;
     const mobileLink = searchParams.get("redirect_to_mobile");
-    if (mobileLink) {
-      setRedirectUrl(mobileLink);
-      
-      // Auto-redirect after a short delay
-      const timer = setTimeout(() => {
-        window.location.replace(mobileLink);
-      }, 1500);
+    const webRedirect = searchParams.get("redirect");
+    const paymentId = searchParams.get("payment_id");
+    const subscriptionId = searchParams.get("subscription_id");
 
-      return () => clearTimeout(timer);
-    } else {
-      // Default fallback for web checkouts
-      router.push("/dashboard");
-    }
+    const processCallback = async () => {
+      // 1. Sync subscription server-side via verify endpoint
+      try {
+        await fetch("/api/dodopayments/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            paymentId: paymentId || undefined,
+            subscriptionId: subscriptionId || undefined,
+          }),
+        });
+        
+        // Eagerly refresh client-side store if on web
+        if (typeof window !== "undefined") {
+          const { useSubscriptionStore } = await import("@/store/useSubscription");
+          await useSubscriptionStore.getState().fetchSubscription();
+          await useSubscriptionStore.getState().fetchUsage();
+        }
+      } catch (err) {
+        console.warn("[PaymentCallback] Verification check completed:", err);
+      }
+
+      if (!isMounted) return;
+
+      // 2. Handle mobile redirection
+      if (mobileLink) {
+        let finalMobileUrl = mobileLink;
+        if (paymentId && !finalMobileUrl.includes("payment_id=")) {
+          const sep = finalMobileUrl.includes("?") ? "&" : "?";
+          finalMobileUrl = `${finalMobileUrl}${sep}payment_id=${encodeURIComponent(paymentId)}`;
+        }
+        if (subscriptionId && !finalMobileUrl.includes("subscription_id=")) {
+          const sep = finalMobileUrl.includes("?") ? "&" : "?";
+          finalMobileUrl = `${finalMobileUrl}${sep}subscription_id=${encodeURIComponent(subscriptionId)}`;
+        }
+        
+        setRedirectUrl(finalMobileUrl);
+        setStatusMessage("Redirecting back to the Jobvanta app...");
+
+        const timer = setTimeout(() => {
+          window.location.replace(finalMobileUrl);
+        }, 1200);
+
+        return () => clearTimeout(timer);
+      }
+
+      // 3. Handle web redirection with context preservation
+      let target = webRedirect || "/dashboard";
+      // Prevent open-redirect or protocol-relative domain attacks
+      if (!target.startsWith("/") || target.startsWith("//")) {
+        target = "/dashboard";
+      }
+
+      // Append payment=success flag for seamless client toast & hydration
+      const separator = target.includes("?") ? "&" : "?";
+      const finalUrl = `${target}${separator}payment=success`;
+
+      setStatusMessage("Payment confirmed! Returning to your session...");
+      router.replace(finalUrl);
+    };
+
+    processCallback();
+
+    return () => {
+      isMounted = false;
+    };
   }, [searchParams, router]);
 
   const handleManualOpen = () => {
@@ -33,10 +92,11 @@ function PaymentCallbackContent() {
 
   if (!redirectUrl) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-900 text-white">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent mx-auto"></div>
-          <p className="mt-4 text-slate-400 font-medium">Processing your payment...</p>
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-white selection:bg-blue-600 p-6">
+        <div className="relative w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900/60 p-8 text-center backdrop-blur-xl shadow-2xl">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-500 border-t-transparent mx-auto"></div>
+          <h2 className="mt-5 text-xl font-bold text-white">Updating Subscription</h2>
+          <p className="mt-2 text-slate-400 text-sm font-medium">{statusMessage}</p>
         </div>
       </div>
     );

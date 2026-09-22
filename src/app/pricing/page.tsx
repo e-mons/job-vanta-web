@@ -38,7 +38,11 @@ export default function PricingPage() {
       return;
     }
 
-    await createCheckoutSession(plan.priceId);
+    const redirectFromUrl = typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('redirect')
+      : null;
+
+    await createCheckoutSession(plan.priceId, redirectFromUrl || undefined);
   };
 
   const getIcon = (name: string, highlighted: boolean) => {

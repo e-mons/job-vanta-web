@@ -46,9 +46,9 @@ interface SubscriptionState {
   fetchUsage: () => Promise<UserDailyUsage | null>;
   isPremium: () => boolean;
   getPlanTier: () => 'free' | 'pro' | 'unlimited';
-  createCheckoutSession: (priceId: string) => Promise<void>;
+  createCheckoutSession: (productId: string, redirectPath?: string) => Promise<void>;
   openCustomerPortal: () => Promise<string | null>;
-  verifyAndSync: () => Promise<void>;
+  verifyAndSync: (paymentId?: string, subscriptionId?: string) => Promise<void>;
 }
 
 export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
@@ -137,9 +137,16 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
    * Call the server-side verify endpoint to check Dodo for recent payments
    * and sync the subscription to Supabase if one is found.
    */
-  verifyAndSync: async () => {
+  verifyAndSync: async (paymentId?: string, subscriptionId?: string) => {
     try {
-      const res = await fetch('/api/dodopayments/verify', { method: 'POST' });
+      const res = await fetch('/api/dodopayments/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...(paymentId ? { paymentId } : {}),
+          ...(subscriptionId ? { subscriptionId } : {}),
+        }),
+      });
       const result = await res.json();
 
       if (result.status === 'synced' || result.status === 'already_active') {
@@ -161,6 +168,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
             isLoading: false,
           });
         }
+        await get().fetchUsage();
       } else {
         set({ status: 'none', planId: null, currentPeriodEnd: null, isLoading: false });
       }
@@ -169,16 +177,22 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
     }
   },
 
-  createCheckoutSession: async (productId: string) => {
-    set({ isLoading: true });
+  createCheckoutSession: async (productId: string, redirectPath?: string) => {
+    set({ isLoading: true, error: null });
     
     try {
+      // Auto-capture the candidate's exact current route and query/hash parameters
+      const currentPath = typeof window !== 'undefined'
+        ? (window.location.pathname + window.location.search + window.location.hash)
+        : '/dashboard';
+      const targetPath = redirectPath || currentPath || '/dashboard';
+
       const response = await fetch('/api/dodopayments/checkout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ productId }),
+        body: JSON.stringify({ productId, redirectPath: targetPath }),
       });
 
       const data = await response.json();
@@ -192,6 +206,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       }
     } catch (err: any) {
       set({ error: err.message, isLoading: false });
+      throw err;
     }
   },
 

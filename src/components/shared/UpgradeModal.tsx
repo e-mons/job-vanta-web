@@ -27,6 +27,7 @@ interface UpgradeModalProps {
   reason?: string;
   targetTier?: UpgradeTargetTier;
   featureContext?: FeatureContext;
+  returnPath?: string;
 }
 
 export default function UpgradeModal({ 
@@ -34,7 +35,8 @@ export default function UpgradeModal({
   onClose, 
   reason, 
   targetTier = 'pro',
-  featureContext = 'general'
+  featureContext = 'general',
+  returnPath,
 }: UpgradeModalProps) {
   const { createCheckoutSession, isLoading } = useSubscriptionStore();
   
@@ -205,7 +207,7 @@ export default function UpgradeModal({
               <div className="flex flex-col gap-3.5">
                 <button
                   disabled={isLoading || !targetPlan.priceId}
-                  onClick={() => createCheckoutSession(targetPlan.priceId!)}
+                  onClick={() => createCheckoutSession(targetPlan.priceId!, returnPath)}
                   className={`w-full flex items-center justify-center gap-3 py-4 sm:py-4.5 rounded-2xl font-black text-base sm:text-lg text-white shadow-xl transition-all active:scale-[0.99] disabled:opacity-50 ${
                     normalizedTier === 'unlimited'
                       ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-purple-600/30'

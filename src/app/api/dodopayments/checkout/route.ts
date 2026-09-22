@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    const { productId, redirectUrl, discountCode } = await req.json();
+    const { productId, redirectUrl, redirectPath, discountCode } = await req.json();
 
     if (!productId) {
       return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
@@ -19,10 +19,45 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-    const return_url = redirectUrl 
-      ? `${siteUrl}/payment-callback?redirect_to_mobile=${encodeURIComponent(redirectUrl)}`
-      : `${siteUrl}/dashboard`;
+    // Sanitize redirect path against open-redirect vulnerabilities
+    const rawPath = redirectPath || (typeof redirectUrl === 'string' && redirectUrl.startsWith('/') ? redirectUrl : null);
+    let safePath = '/dashboard';
+    if (
+      rawPath && 
+      typeof rawPath === 'string' && 
+      rawPath.startsWith('/') && 
+      !rawPath.startsWith('//') && 
+      !rawPath.toLowerCase().includes('javascript:')
+    ) {
+      safePath = rawPath;
+    }
+
+    // Dynamically detect origin from request headers so preview/production domains work out-of-the-box
+    const originHeader = req.headers.get('origin') || req.headers.get('referer');
+    let dynamicOrigin = '';
+    if (originHeader) {
+      try {
+        const parsed = new URL(originHeader);
+        dynamicOrigin = parsed.origin;
+      } catch {}
+    }
+    const hostHeader = req.headers.get('x-forwarded-host') || req.headers.get('host');
+    const protoHeader = req.headers.get('x-forwarded-proto') || 'https';
+    const hostOrigin = hostHeader ? `${protoHeader}://${hostHeader}` : '';
+
+    const siteUrl = dynamicOrigin || hostOrigin || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    let return_url = `${siteUrl}/payment-callback?redirect=${encodeURIComponent(safePath)}`;
+
+    // If mobile deep-link redirect requested
+    if (
+      redirectUrl && 
+      (redirectUrl.startsWith('jobvanta://') || 
+       redirectUrl.startsWith('exp://') || 
+       redirectUrl.includes('payment/callback') || 
+       redirectUrl.includes('subscription'))
+    ) {
+      return_url = `${siteUrl}/payment-callback?redirect_to_mobile=${encodeURIComponent(redirectUrl)}`;
+    }
 
     // Create Dodo Payments Checkout Session
     const sessionPayload: any = {
@@ -40,6 +75,8 @@ export async function POST(req: Request) {
       return_url,
       metadata: {
         userId: user.id,
+        return_path: safePath,
+        ...(redirectUrl ? { mobileRedirectUrl: redirectUrl } : {}),
         ...(discountCode ? { promoCode: discountCode } : {}),
       },
     };

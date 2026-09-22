@@ -6,15 +6,188 @@ import { PLANS } from "@/config/plans";
 
 export const dynamic = 'force-dynamic';
 
+async function syncPaymentForUser(
+  userId: string,
+  paymentId?: string | null,
+  subscriptionId?: string | null
+) {
+  const adminSupabase = createAdminClient();
+  let foundPayment: any = null;
+  let foundSubscription: any = null;
+
+  // 1. Direct payment lookup if paymentId is available
+  if (paymentId) {
+    try {
+      const payment = await dodo.payments.retrieve(paymentId);
+      if (
+        payment &&
+        (payment.status === "succeeded" || payment.status === "processing") &&
+        (!payment.metadata?.userId || (payment.metadata as any).userId === userId)
+      ) {
+        foundPayment = payment;
+      }
+    } catch (e: any) {
+      console.warn(`[Verify] Could not retrieve payment by ID ${paymentId}:`, e.message);
+    }
+  }
+
+  // 2. Direct subscription lookup if subscriptionId is available
+  if (!foundPayment && subscriptionId) {
+    try {
+      const sub = await dodo.subscriptions.retrieve(subscriptionId);
+      if (
+        sub &&
+        (sub.status === "active" || (sub.status as any) === "on_hold" || (sub.status as any) === "trialing") &&
+        (!sub.metadata?.userId || (sub.metadata as any).userId === userId)
+      ) {
+        foundSubscription = sub;
+      }
+    } catch (e: any) {
+      console.warn(`[Verify] Could not retrieve subscription by ID ${subscriptionId}:`, e.message);
+    }
+  }
+
+  // 3. If not found directly, scan recent payments by user metadata
+  if (!foundPayment && !foundSubscription) {
+    try {
+      const payments = dodo.payments.list({ page_size: 20 });
+      for await (const payment of payments) {
+        if (
+          payment.metadata &&
+          (payment.metadata as any).userId === userId &&
+          (payment.status === "succeeded" || payment.status === "processing")
+        ) {
+          foundPayment = payment;
+          break;
+        }
+      }
+    } catch (listErr: any) {
+      console.warn(`[Verify] Error scanning recent payments:`, listErr.message);
+    }
+  }
+
+  // 4. If still not found, scan recent subscriptions by user metadata
+  if (!foundPayment && !foundSubscription) {
+    try {
+      const subs = dodo.subscriptions.list({ page_size: 20 });
+      for await (const sub of subs) {
+        if (
+          sub.metadata &&
+          (sub.metadata as any).userId === userId &&
+          (sub.status === "active" || (sub.status as any) === "trialing")
+        ) {
+          foundSubscription = sub;
+          break;
+        }
+      }
+    } catch (listErr: any) {
+      console.warn(`[Verify] Error scanning recent subscriptions:`, listErr.message);
+    }
+  }
+
+  if (!foundPayment && !foundSubscription) {
+    return { success: false, reason: "no_payment_found" };
+  }
+
+  // Determine the plan from the product_id
+  const rawProductId = foundPayment
+    ? (foundPayment.product_id || (foundPayment.product_cart && foundPayment.product_cart[0]?.product_id))
+    : (foundSubscription?.product_id);
+  
+  let resolvedPlanId = "pro";
+  if (rawProductId === "pdt_0NewgKeXYMkBEofXpxy9Z" || rawProductId === "unlimited" || rawProductId === "enterprise") {
+    resolvedPlanId = "unlimited";
+  } else if (rawProductId === "pdt_0Newfu26VwAPCKJBoT8z5" || rawProductId === "pro") {
+    resolvedPlanId = "pro";
+  } else {
+    const matchedPlan = PLANS.find(p => p.priceId === rawProductId || p.id === rawProductId);
+    resolvedPlanId = (matchedPlan?.id as string) || rawProductId || "pro";
+  }
+
+  const todayDate = new Date().toISOString().split("T")[0];
+  const customerId = foundPayment
+    ? (foundPayment.customer?.customer_id || (foundPayment as any).customer_id)
+    : (foundSubscription?.customer?.customer_id || (foundSubscription as any).customer_id);
+  const resolvedSubId = foundPayment?.subscription_id || foundSubscription?.subscription_id || null;
+  const resolvedPayId = foundPayment?.payment_id || null;
+  const nextBilling = foundSubscription?.next_billing_date 
+    || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  // Upsert the subscription into Supabase
+  const { error } = await adminSupabase
+    .from("subscriptions")
+    .upsert({
+      user_id: userId,
+      dodo_customer_id: customerId || null,
+      dodo_subscription_id: resolvedSubId,
+      dodo_payment_id: resolvedPayId,
+      last_payment_details: foundPayment || foundSubscription,
+      plan_id: resolvedPlanId,
+      status: "active",
+      daily_ai_applies_count: 0,
+      daily_usage_date: todayDate,
+      current_period_end: nextBilling,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" });
+
+  if (error) {
+    console.error("[Verify] Supabase upsert error:", error);
+    throw error;
+  }
+
+  console.log(`[Verify] Subscription synced for user ${userId}, plan: ${resolvedPlanId}`);
+  return { 
+    success: true, 
+    planId: resolvedPlanId, 
+    payment: foundPayment || foundSubscription 
+  };
+}
+
+/**
+ * GET /api/dodopayments/verify
+ * Optional direct redirect return handler from Dodo checkout
+ */
+export async function GET(req: Request) {
+  const { searchParams, origin } = new URL(req.url);
+  const paymentId = searchParams.get('payment_id');
+  const subscriptionId = searchParams.get('subscription_id');
+  const rawRedirect = searchParams.get('redirect') || '/dashboard';
+  const isMobile = searchParams.get('mobile') === 'true';
+
+  let safeRedirect = '/dashboard';
+  if (
+    rawRedirect &&
+    rawRedirect.startsWith('/') &&
+    !rawRedirect.startsWith('//') &&
+    !rawRedirect.toLowerCase().includes('javascript:')
+  ) {
+    safeRedirect = rawRedirect;
+  }
+
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (user) {
+      await syncPaymentForUser(user.id, paymentId, subscriptionId);
+    }
+  } catch (err: any) {
+    console.warn('[Verify GET] Warning syncing payment:', err.message);
+  }
+
+  if (isMobile) {
+    return NextResponse.redirect(
+      `jobvanta://payment/callback?status=success&returnPath=${encodeURIComponent(safeRedirect)}`
+    );
+  }
+
+  const separator = safeRedirect.includes('?') ? '&' : '?';
+  return NextResponse.redirect(`${origin}${safeRedirect}${separator}payment=success`);
+}
+
 /**
  * POST /api/dodopayments/verify
- * 
- * Called after the user returns from Dodo checkout.
- * Lists recent payments for the current user's email and syncs
- * the subscription to Supabase if a successful payment is found.
- * 
- * This is a fallback mechanism for when webhooks can't reach 
- * the server (e.g., localhost development).
+ * Called by client after user returns from Dodo checkout
  */
 export async function POST(req: Request) {
   try {
@@ -25,91 +198,35 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if user already has an active subscription in our DB
-    const adminSupabase = createAdminClient();
-    const { data: existingSub } = await adminSupabase
-      .from("subscriptions")
-      .select("status, plan_id")
-      .eq("user_id", user.id)
-      .single();
+    const body = await req.json().catch(() => ({}));
+    const paymentId = body.paymentId || body.payment_id || null;
+    const subscriptionId = body.subscriptionId || body.subscription_id || null;
 
-    if (existingSub && existingSub.status === "active") {
-      return NextResponse.json({ 
-        status: "already_active",
-        planId: existingSub.plan_id 
-      });
-    }
+    const result = await syncPaymentForUser(user.id, paymentId, subscriptionId);
 
-    // List recent payments from Dodo to find one belonging to this user
-    let foundPayment: any = null;
+    if (!result.success) {
+      // Fallback: check if user already has an active subscription in our DB
+      const adminSupabase = createAdminClient();
+      const { data: existingSub } = await adminSupabase
+        .from("subscriptions")
+        .select("status, plan_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-    const payments = dodo.payments.list({ page_size: 20 });
-    for await (const payment of payments) {
-      // Check if this payment belongs to the current user via metadata
-      if (
-        payment.metadata &&
-        (payment.metadata as any).userId === user.id &&
-        payment.status === "succeeded"
-      ) {
-        foundPayment = payment;
-        break;
+      if (existingSub && existingSub.status === "active") {
+        return NextResponse.json({ 
+          status: "already_active",
+          planId: existingSub.plan_id 
+        });
       }
-    }
 
-    if (!foundPayment) {
-      console.log(`[Verify] No successful payment found for user ${user.id}`);
+      console.log(`[Verify] No successful payment or subscription found for user ${user.id}`);
       return NextResponse.json({ status: "no_payment_found" });
     }
 
-    console.log(`[Verify] Found payment for user ${user.id}:`, {
-      payment_id: foundPayment.payment_id,
-      product_id: foundPayment.product_id,
-      status: foundPayment.status,
-    });
-
-    // Determine the plan from the product_id
-    const productId = foundPayment.product_id || 
-      (foundPayment.product_cart && foundPayment.product_cart[0]?.product_id);
-    
-    let resolvedPlanId = "pro";
-    if (productId === "pdt_0NewgKeXYMkBEofXpxy9Z" || productId === "unlimited" || productId === "enterprise") {
-      resolvedPlanId = "unlimited";
-    } else if (productId === "pdt_0Newfu26VwAPCKJBoT8z5" || productId === "pro") {
-      resolvedPlanId = "pro";
-    } else {
-      const matchedPlan = PLANS.find(p => p.priceId === productId || p.id === productId);
-      resolvedPlanId = (matchedPlan?.id as string) || productId || "pro";
-    }
-
-    const todayDate = new Date().toISOString().split("T")[0];
-
-    // Upsert the subscription into Supabase
-    const { error } = await adminSupabase
-      .from("subscriptions")
-      .upsert({
-        user_id: user.id,
-        dodo_customer_id: foundPayment.customer?.customer_id || foundPayment.customer_id || null,
-        dodo_subscription_id: foundPayment.subscription_id || null,
-        dodo_payment_id: foundPayment.payment_id || null,
-        last_payment_details: foundPayment,
-        plan_id: resolvedPlanId,
-        status: "active",
-        daily_ai_applies_count: 0,
-        daily_usage_date: todayDate,
-        current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "user_id" });
-
-    if (error) {
-      console.error("[Verify] Supabase upsert error:", error);
-      throw error;
-    }
-
-    console.log(`[Verify] Subscription synced for user ${user.id}, plan: ${resolvedPlanId}`);
-
     return NextResponse.json({ 
       status: "synced",
-      planId: resolvedPlanId,
+      planId: result.planId,
     });
 
   } catch (err: any) {
