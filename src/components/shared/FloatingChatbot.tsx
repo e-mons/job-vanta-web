@@ -241,18 +241,19 @@ export default function FloatingChatbot() {
 
   // Realtime subscription for human support messages
   useEffect(() => {
-    if (!user || !activeTicket) return;
+    if (!user?.id || !activeTicket?.id) return;
+    const ticketId = activeTicket.id;
 
     const supabase = createClient();
     const channel = supabase
-      .channel(`candidate-ticket-${activeTicket.id}`)
+      .channel(`candidate-ticket-${ticketId}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
           table: "support_messages",
-          filter: `ticket_id=eq.${activeTicket.id}`,
+          filter: `ticket_id=eq.${ticketId}`,
         },
         (payload: any) => {
           const newMsg = payload.new as SupportMessage;
@@ -274,7 +275,7 @@ export default function FloatingChatbot() {
           event: "UPDATE",
           schema: "public",
           table: "support_tickets",
-          filter: `id=eq.${activeTicket.id}`,
+          filter: `id=eq.${ticketId}`,
         },
         (payload: any) => {
           setActiveTicket((prev: SupportTicket | null) => (prev ? { ...prev, ...payload.new } : payload.new));
@@ -285,7 +286,7 @@ export default function FloatingChatbot() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, activeTicket, playChime]);
+  }, [user?.id, activeTicket?.id, playChime]);
 
   // Auto-scroll
   useEffect(() => {

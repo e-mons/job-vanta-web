@@ -186,9 +186,9 @@ export async function createBrowserbaseSession(): Promise<{ sessionId: string; c
     }
   }
 
-  // Simulated session reference for local development/testing
-  const simId = `bb_sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  return { sessionId: simId };
+  throw new Error(
+    "Browserbase session creation failed: Browserbase credentials are not configured or API is unreachable."
+  );
 }
 
 /**
@@ -599,18 +599,34 @@ export async function fillAndSubmitApplication(params: {
           } catch (navErr: any) {
             console.warn("[Browserbase] Page navigation/filling warning (non-fatal):", navErr.message);
           }
-        }
-      }
-    } else {
-      console.log(`[Browserbase] Credentials not configured or simulated, completing simulated submission for ${applicationId}`);
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-    }
 
-    return {
-      success: true,
-      sessionId: liveSessionId,
-      confirmationMessage: `Application successfully submitted on ${platform.toUpperCase()} via Browserbase AI Agent.`,
-    };
+          return {
+            success: true,
+            sessionId: liveSessionId,
+            confirmationMessage: `Application form successfully filled for ${platform} application ${applicationId}.`,
+          };
+        }
+
+        return {
+          success: false,
+          sessionId: liveSessionId,
+          error: `Failed to connect to cloud browser session ${liveSessionId} after multiple attempts.`,
+        };
+      }
+
+      return {
+        success: false,
+        sessionId: liveSessionId,
+        error: "No connectUrl returned by Browserbase session.",
+      };
+    } else {
+      console.warn(`[Browserbase] Credentials not configured. Automated submission cannot proceed for ${applicationId}.`);
+      return {
+        success: false,
+        sessionId: liveSessionId,
+        error: "Browserbase automation credentials (BROWSERBASE_API_KEY / BROWSERBASE_PROJECT_ID) are not configured on the server. Please apply directly on the employer's official job page.",
+      };
+    }
   } catch (err: any) {
     console.error("[Browserbase] Automated submission error:", err);
     return {

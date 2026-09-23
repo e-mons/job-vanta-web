@@ -14,9 +14,6 @@ function getAI(): GoogleGenAI {
 }
 
 const ACTIVE_MODELS = [
-  "gemini-3.8-flash",
-  "gemini-3.7-flash",
-  "gemini-3.6-flash",
   "gemini-2.0-flash",
   "gemini-1.5-flash",
   "gemini-1.5-pro",
@@ -97,9 +94,6 @@ export async function callGeminiWithAudioFallback(
 ): Promise<string> {
   const base64Audio = audioBuffer.toString("base64");
   const models = [
-    "gemini-3.8-flash",
-    "gemini-3.7-flash",
-    "gemini-3.6-flash",
     "gemini-2.0-flash",
     "gemini-1.5-flash",
     "gemini-1.5-pro",
