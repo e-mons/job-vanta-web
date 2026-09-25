@@ -217,11 +217,14 @@ function parseAndValidate(rawText: string) {
 }
 
 export async function POST(req: NextRequest) {
+  let buffer: Buffer | null = null;
+  let originalName: string = "resume.pdf";
+  let storagePath: string | null = null;
+  let isPdf = false;
+  let isZipOrDocx = false;
+
   try {
     const contentType = req.headers.get("content-type") || "";
-
-    let buffer: Buffer;
-    let originalName: string = "resume.pdf";
     let paramFileType: string = "";
 
     if (contentType.includes("application/json")) {
@@ -258,8 +261,8 @@ export async function POST(req: NextRequest) {
     const fileName = originalName.toLowerCase();
 
     // Magic bytes detection
-    const isPdf = buffer.length >= 4 && buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46; // %PDF
-    const isZipOrDocx = (buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4B && buffer[2] === 0x03 && buffer[3] === 0x04) || fileName.endsWith(".docx") || fileName.endsWith(".doc"); // PK.. or .docx/.doc
+    isPdf = buffer.length >= 4 && buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46; // %PDF
+    isZipOrDocx = (buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4B && buffer[2] === 0x03 && buffer[3] === 0x04) || fileName.endsWith(".docx") || fileName.endsWith(".doc"); // PK.. or .docx/.doc
     const isTxt = fileName.endsWith(".txt") || (!isPdf && !isZipOrDocx && paramFileType === "text/plain");
 
     let mimeType = isPdf
@@ -273,7 +276,6 @@ export async function POST(req: NextRequest) {
     console.log(`[Resume Parse] Processing file: ${fileName}, size: ${buffer.length}, detected: ${isPdf ? "PDF" : isZipOrDocx ? "DOCX" : isTxt ? "TXT" : "Other"}, mime: ${mimeType}`);
 
     // Optional upload to Supabase storage bucket `resumes` if user is logged in
-    let storagePath: string | null = null;
     try {
       const supabase = await createClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -431,6 +433,71 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     const msg: string = error?.message ?? "Unknown error";
     console.error("[Resume Parse] Error:", { message: msg, stack: error?.stack });
+
+    // Resilient offline fallback: If AI call failed, extract text directly so user is never blocked
+    if (buffer && buffer.length > 0) {
+      try {
+        let extractedText = "";
+        if (isZipOrDocx) {
+          const mammothModule = await import("mammoth");
+          const mammoth = (mammothModule as any).default || mammothModule;
+          const result = await mammoth.extractRawText({ buffer });
+          extractedText = (result?.value || "").trim();
+        } else if (isPdf) {
+          const pdfParseModule: any = await import("pdf-parse");
+          if (pdfParseModule.PDFParse) {
+            const parser = new pdfParseModule.PDFParse({ data: buffer });
+            const result = await parser.getText();
+            extractedText = (result?.text || "").trim();
+          } else if (typeof pdfParseModule.default === "function") {
+            const result = await pdfParseModule.default(buffer);
+            extractedText = (result?.text || "").trim();
+          } else if (typeof pdfParseModule === "function") {
+            const result = await pdfParseModule(buffer);
+            extractedText = (result?.text || "").trim();
+          }
+        } else {
+          extractedText = buffer.toString("utf-8").trim();
+        }
+
+        if (extractedText && extractedText.length > 20) {
+          console.warn("[Resume Parse] Graceful text fallback activated due to AI failure:", msg);
+          const emailMatch = extractedText.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/);
+          const phoneMatch = extractedText.match(/(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
+          const lines = extractedText.split("\n").map((l) => l.trim()).filter(Boolean);
+          const detectedName = lines[0] && lines[0].length < 60 && !lines[0].includes("@")
+            ? lines[0]
+            : (originalName.replace(/\.[^/.]+$/, "") || "Extracted Resume");
+
+          return NextResponse.json({
+            success: true,
+            data: {
+              personalInfo: {
+                fullName: detectedName,
+                email: emailMatch ? emailMatch[0] : "",
+                phone: phoneMatch ? phoneMatch[0] : "",
+                location: "",
+                website: "",
+                summary: extractedText.substring(0, 1500),
+                photo: "",
+              },
+              experience: [],
+              education: [],
+              skills: [],
+              projects: [],
+              certifications: [],
+              languages: [],
+              interests: [],
+              references: [],
+            },
+            storagePath,
+            fallbackUsed: true,
+          });
+        }
+      } catch (fallbackErr: any) {
+        console.error("[Resume Parse] Graceful text fallback error:", fallbackErr.message);
+      }
+    }
 
     let userMessage = "Failed to parse resume. Please try again.";
 
