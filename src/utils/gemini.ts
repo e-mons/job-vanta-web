@@ -14,9 +14,11 @@ function getAI(): GoogleGenAI {
 }
 
 const ACTIVE_MODELS = [
-  "gemini-2.0-flash",
-  "gemini-1.5-flash",
-  "gemini-1.5-pro",
+  "gemini-3.8-flash",
+  "gemini-3.7-flash",
+  "gemini-3.5-flash",
+  "gemini-flash-latest",
+  "gemini-3.1-flash-lite",
 ];
 
 let _cachedModel: string | null = null;
@@ -94,9 +96,11 @@ export async function callGeminiWithAudioFallback(
 ): Promise<string> {
   const base64Audio = audioBuffer.toString("base64");
   const models = [
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
+    "gemini-3.8-flash",
+    "gemini-3.7-flash",
+    "gemini-3.5-flash",
+    "gemini-flash-latest",
+    "gemini-3.1-flash-lite",
   ];
   const timeoutMs = options.timeoutMs || 35000; // 35s for audio
 

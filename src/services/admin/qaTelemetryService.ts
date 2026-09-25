@@ -54,7 +54,7 @@ export function estimateGeminiCost(model: string, promptTokens: number, completi
 export async function recordGenerationTelemetry(params: RecordTelemetryParams): Promise<QAGenerationLog | null> {
   try {
     const adminClient = createAdminClient();
-    const model = params.modelName || "gemini-2.0-flash";
+    const model = params.modelName || "gemini-3.8-flash";
     const promptTokens = params.promptTokens || 0;
     const completionTokens = params.completionTokens || 0;
     const estimatedCost = estimateGeminiCost(model, promptTokens, completionTokens);

@@ -439,7 +439,7 @@ ${prompt}
         latencyMs,
         promptTokens: Math.round(prompt.length / 4),
         completionTokens: Math.round(rawResponse.length / 4),
-        modelName: settings.active_gemini_model || "gemini-2.0-flash",
+        modelName: settings.active_gemini_model || "gemini-3.8-flash",
         platform: "web",
       });
     } catch (telemetryErr) {
@@ -485,7 +485,7 @@ ${prompt}
         errorCategory: errorCat,
         errorMessage: err.message,
         latencyMs,
-        modelName: "gemini-2.0-flash",
+        modelName: "gemini-3.8-flash",
         platform: "web",
       });
     } catch (telemetryErr) {
